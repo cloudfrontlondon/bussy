@@ -12,15 +12,28 @@ body {
   text-align: center;
   margin: 0;
   padding: 20px;
+  transition: background-color 0.8s ease;
 }
-h1 { font-size: 22px; margin-bottom: 20px; }
+h1 { 
+  font-size: 24px; 
+  margin-bottom: 10px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  gap: 10px;
+}
 .bus {
-  font-size: 40px;
+  font-size: 48px;
   margin: 15px 0;
+  font-weight: bold;
 }
 .small {
   color: #aaa;
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 button {
   margin-top: 20px;
@@ -35,93 +48,100 @@ button {
 button:hover {
   background-color: #005f99;
 }
+
+/* Color classes */
+.bg-red    { background-color: #8B0000; }
+.bg-amber  { background-color: #FF8C00; }
+.bg-green  { background-color: #006400; }
+
+/* Icon sizing */
+.icon { width: 32px; height: 32px; }
+.update-icon { width: 16px; height: 16px; fill: #aaa; }
 </style>
 </head>
 
-<body>
+<body class="bg-red">
+
+<!-- Inline SVG for London double-decker bus (simplified public domain style) -->
+<svg class="icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="fill: #ff0000;">
+  <path d="M480 192H32c-17.7 0-32 14.3-32 32v96c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-96c0-17.7-14.3-32-32-32zM96 352c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm320 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zM480 96H32C14.3 96 0 110.3 0 128v32c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32z"/>
+  <rect x="64" y="64" width="384" height="128" fill="#ffffff"/>
+</svg>
 
 <h1>Parkway → Morden (413)</h1>
+
 <div id="buses">Loading…</div>
+
 <button id="soundToggleButton">Sound OFF</button>
+
+<!-- Inline SVG for clock icon (simple white/gray) -->
+<svg class="update-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+</svg>
 
 <script>
 const stop = "490010849N";
 const url = `https://api.tfl.gov.uk/StopPoint/${stop}/Arrivals`;
 
-// Load sound for the beep
 const beep = new Audio("https://www.soundjay.com/button/beep-07.wav");
-beep.load(); // Preload the audio
+beep.load();
 
-let soundEnabled = false; // Track if sound is currently enabled
+let soundEnabled = false;
 
-// Prevent Screen Lock
 let wakeLock = null;
 async function requestWakeLock() {
   try {
     if ("wakeLock" in navigator) {
       wakeLock = await navigator.wakeLock.request("screen");
-      console.log("Wake lock is active.");
-    } else {
-      console.log("Wake Lock API is not supported in this browser.");
+      console.log("Wake lock active.");
     }
   } catch (err) {
-    console.error("Failed to acquire wake lock:", err);
+    console.error("Wake lock failed:", err);
+  }
+}
+
+function updateBackground(nextSeconds) {
+  const body = document.body;
+  body.classList.remove("bg-red", "bg-amber", "bg-green");
+
+  if (nextSeconds === null || nextSeconds > 360) {
+    body.classList.add("bg-red");
+  } else if (nextSeconds >= 270 && nextSeconds <= 360) {
+    body.classList.add("bg-amber");
+  } else {
+    body.classList.add("bg-green"); // covers 150–269 and <150
   }
 }
 
 async function load() {
-  // Fetch bus data
-  const r = await fetch(url);
-  const data = await r.json();
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("API error");
+    const data = await r.json();
 
-  const buses = data
-    .filter(b => b.lineName === "413")
-    .sort((a, b) => a.timeToStation - b.timeToStation)
-    .slice(0, 3);
+    const buses = data
+      .filter(b => b.lineName === "413")
+      .sort((a, b) => a.timeToStation - b.timeToStation)
+      .slice(0, 3);
 
-  let html = "";
+    let html = "";
+    let shouldBeep = false;
+    let nextSeconds = null;
 
-  let shouldBeep = false; // Track if we should beep
+    buses.forEach((bus, i) => {
+      const sec = bus.timeToStation;
+      const min = Math.round(sec / 60);
+      html += `<div class="bus">${min} min</div>`;
 
-  buses.forEach(bus => {
-    const min = Math.round(bus.timeToStation / 60);
-    html += `<div class="bus">${min} min</div>`;
-    if (min < 5) {
-      shouldBeep = true;
+      if (i === 0) nextSeconds = sec;
+      if (sec < 300) shouldBeep = true;
+    });
+
+    if (buses.length === 0) {
+      html = '<div class="bus">No 413 buses right now</div>';
+      nextSeconds = null;
     }
-  });
 
-  // Play sound if enabled and a bus is less than 5 minutes away
-  if (soundEnabled && shouldBeep) {
-    beep.play().catch(err => console.error("Error playing beep:", err)); // Handle autoplay blocking errors
-  }
-
-  html += `<div class="small">Updated ${new Date().toLocaleTimeString()}</div>`;
-
-  document.getElementById("buses").innerHTML = html;
-}
-
-// Toggle sound on/off
-document.getElementById("soundToggleButton").addEventListener("click", () => {
-  soundEnabled = !soundEnabled; // Toggle sound state
-
-  // Update button text based on sound state
-  const button = document.getElementById("soundToggleButton");
-  button.textContent = soundEnabled ? "Sound ON" : "Sound OFF";
-});
-
-// Automatically load and refresh data every 15 seconds
-load();
-setInterval(load, 15000);
-
-// Request wake lock to prevent screen locking when page is open
-requestWakeLock();
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
-    requestWakeLock();
-  }
-});
-</script>
-
-</body>
-</html>
+    html += `<div class="small">
+      <svg class="update-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.
