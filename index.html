@@ -1,184 +1,161 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>413 – Parkway | TfL Status</title>
+<meta charset="utf-8">
+<title>413 – Parkway</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  body {
-    font-family: -apple-system, BlinkMacOSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #000;
-    color: #fff;
-    text-align: center;
-    margin: 0;
-    padding: 20px;
-    padding-bottom: 220px;
-    min-height: 100vh;
-    transition: background-color 0.8s ease;
-  }
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  h1 {
-    font-size: 26px;
-    margin: 0;
-  }
-  .bus-line {
-    margin: 20px 0;
-  }
-  .bus {
-    font-size: 48px;
-    font-weight: bold;
-  }
-  .change-markers {
-    margin-top: 6px;
-    display: flex;
-    justify-content: center;
-    gap: 6px;
-    min-height: 28px;
-  }
-  .marker {
-    width: 28px;
-    height: 28px;
-    line-height: 28px;
-    font-size: 18px;
-    border-radius: 6px;
-    text-align: center;
-    font-weight: bold;
-  }
-  .marker.same   { background: #444; color: #aaa; }
-  .marker.up     { background: #8B0000; color: #fff; }
-  .marker.down   { background: #006400; color: #fff; }
-  .warning {
-    font-size: 28px;
-    color: #ff4444;
-    margin-left: 12px;
-    align-self: center;
-  }
-  .tube-critical, .swr-status {
-    margin: 16px 0;
-    padding: 12px;
-    border-radius: 8px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .tube-line {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    margin: 4px 0;
-    cursor: pointer;
-  }
-  .tube-line:hover { opacity: 0.85; }
-  .modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-  }
-  .modal-content {
-    background: #111;
-    padding: 24px;
-    border-radius: 12px;
-    max-width: 90%;
-    width: 420px;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-  .modal.show { display: flex; }
-  .icon-btn {
-    background: transparent;
-    border: none;
-    color: #fff;
-    font-size: 24px;
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border-radius: 12px;
-    transition: background 0.2s;
-  }
-  .icon-btn:hover, .icon-btn:focus {
-    background: rgba(255,255,255,0.15);
-  }
-  button {
-    padding: 10px 14px;
-    font-size: 15px;
-    background-color: #007ACC;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  button:hover { background-color: #005f99; }
+body {
+  font-family: -apple-system, system-ui;
+  background: #000;
+  color: #fff;
+  text-align: center;
+  margin: 0;
+  padding: 20px;
+  padding-bottom: 200px;
+  transition: background-color 0.8s ease;
+  position: relative;
+  min-height: 100vh;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+h1 {
+  font-size: 26px;
+  margin: 0;
+}
+.bus-line {
+  margin: 20px 0;
+}
+.bus {
+  font-size: 48px;
+  font-weight: bold;
+}
+.change-markers {
+  margin-top: 6px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+}
+.marker {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+  font-size: 18px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: bold;
+}
+.marker.same   { background: #444; color: #aaa; }
+.marker.up     { background: #8B0000; color: #fff; }
+.marker.down   { background: #006400; color: #fff; }
+.warning {
+  font-size: 28px;
+  color: #ff4444;
+  margin-left: 12px;
+  align-self: center;
+}
+.small {
+  color: #aaa;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.location, .error-msg {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #ccc;
+}
+.error-msg { color: #ff6666; }
 
-  .bg-red    { background-color: #8B0000; }
-  .bg-amber  { background-color: #FF8C00; }
-  .bg-green  { background-color: #32CD32; }
-  .bg-yellow { background-color: #FFD700; }
+/* Transparent icon buttons */
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.2s;
+}
+.icon-btn:hover,
+.icon-btn:focus {
+  background: rgba(255,255,255,0.15);
+  outline: none;
+}
 
-  .icon { width: 40px; height: 40px; }
-  .progress-container {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 8px;
-    background: rgba(255,255,255,0.15);
-    z-index: 10;
-  }
-  .progress-bar {
-    height: 100%;
-    width: 100%;
-    background: rgba(255,255,255,0.7);
-    transform-origin: left;
-    animation: countdown 15s linear forwards;
-  }
-  @keyframes countdown {
-    from { transform: scaleX(1); }
-    to   { transform: scaleX(0); }
-  }
-  #graphContainer {
-    position: fixed;
-    bottom: 20px;
-    left: 10px;
-    right: 10px;
-    height: 160px;
-    background: rgba(0,0,0,0.6);
-    border-radius: 8px;
-    padding: 10px;
-    box-sizing: border-box;
-    transition: opacity 0.3s ease, height 0.3s ease, padding 0.3s ease;
-  }
-  #graphContainer.hidden {
-    opacity: 0;
-    height: 0;
-    padding: 0;
-    margin: 0;
-    pointer-events: none;
-  }
+/* Colors */
+.bg-red    { background-color: #8B0000; }
+.bg-amber  { background-color: #FF8C00; }
+.bg-green  { background-color: #32CD32; }
+.bg-yellow { background-color: #FFD700; }
+
+/* Icons & progress */
+.icon { width: 40px; height: 40px; }
+.progress-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: rgba(255,255,255,0.15);
+  z-index: 10;
+}
+.progress-bar {
+  height: 100%;
+  width: 100%;
+  background: rgba(255,255,255,0.7);
+  transform-origin: left;
+  animation: countdown 15s linear forwards;
+}
+@keyframes countdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+/* Graph */
+#graphContainer {
+  position: fixed;
+  bottom: 20px;
+  left: 10px;
+  right: 10px;
+  height: 160px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+  transition: opacity 0.3s ease, height 0.3s ease, padding 0.3s ease;
+}
+#graphContainer.hidden {
+  opacity: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
+}
 </style>
 </head>
+
 <body class="bg-red">
 
 <header>
@@ -190,33 +167,15 @@
     <h1>Parkway → Morden (413)</h1>
   </div>
 
-  <div style="display:flex; gap:8px;">
+  <div style="display: flex; gap: 8px;">
     <button id="toggleGraphBtn" class="icon-btn" title="Toggle graph">📊</button>
     <button id="refreshBtn" class="icon-btn" title="Refresh now">🔄</button>
   </div>
 </header>
 
-<div id="tubeCritical"></div>
-<div id="swrStatus" class="swr-status" style="display:none;"></div>
-
 <div id="buses">Loading…</div>
 <div id="location" class="location">Stop location: Loading…</div>
 <div id="errorMsg" class="error-msg"></div>
-
-<button id="toggleTubeBtn" class="icon-btn" style="margin:16px auto; display:block; font-size:28px;" title="Toggle all Tube lines">📊</button>
-
-<div id="tubeFull" style="display:none; margin:20px 0;">
-  <div id="tubeLines"></div>
-</div>
-
-<div id="tubeModal" class="modal">
-  <div class="modal-content">
-    <h2 id="modalLineName"></h2>
-    <div id="modalStatus"></div>
-    <div id="modalReason" style="margin-top:12px; font-size:15px;"></div>
-    <button onclick="document.getElementById('tubeModal').classList.remove('show')" style="margin-top:20px;">Close</button>
-  </div>
-</div>
 
 <div id="graphContainer">
   <canvas id="etaChart"></canvas>
@@ -227,7 +186,6 @@
 </div>
 
 <script>
-// Global variables
 let etaChart;
 const etaHistory = [];
 const MAX_POINTS = 20;
@@ -237,17 +195,7 @@ let previousTimes = [];
 let changeHistory = [];
 let consecutiveNoDecrease = 0;
 let graphVisible = true;
-let tubeUpdateCounter = 0;
-let tubeData = null;
-let swrData = null;
 
-const lineColours = {
-  "bakerloo": "#B36305", "central": "#E32017", "circle": "#FFD300", "district": "#00782A",
-  "elizabeth": "#6959CD", "hammersmith-city": "#F4A261", "jubilee": "#A0A5A9", "metropolitan": "#9B0056",
-  "northern": "#000000", "piccadilly": "#0019A8", "victoria": "#0098D4", "waterloo-city": "#95CDBA"
-};
-
-// Chart init
 function initChart() {
   const ctx = document.getElementById('etaChart').getContext('2d');
   etaChart = new Chart(ctx, {
@@ -273,7 +221,6 @@ function initChart() {
   });
 }
 
-// Chart update
 function updateChart(seconds) {
   if (seconds === null) return;
   etaHistory.push({ time: new Date(), seconds });
@@ -284,7 +231,6 @@ function updateChart(seconds) {
   etaChart.update();
 }
 
-// Time format
 function formatTime(seconds) {
   if (seconds < 0) return "Due";
   const mins = Math.floor(seconds / 60);
@@ -292,14 +238,12 @@ function formatTime(seconds) {
   return `${mins} min ${secs.toString().padStart(2,'0')} s`;
 }
 
-// Change marker
 function getChangeMarker(delta) {
   if (delta > 0) return {symbol: '↑', class: 'up'};
   if (delta < 0) return {symbol: '↓', class: 'down'};
   return {symbol: '→', class: 'same'};
 }
 
-// Render buses + markers + warning
 function renderBusesWithMarkers() {
   let html = "";
   let nextSeconds = null;
@@ -317,6 +261,7 @@ function renderBusesWithMarkers() {
         });
         markersHtml += '</div>';
       }
+
       if (consecutiveNoDecrease >= 8) {
         warningHtml = '<span class="warning">⚠️</span>';
       }
@@ -339,7 +284,6 @@ function renderBusesWithMarkers() {
   updateBackground(nextSeconds);
 }
 
-// Countdown timer
 function startCountdown() {
   if (countdownInterval) clearInterval(countdownInterval);
   countdownInterval = setInterval(() => {
@@ -350,7 +294,6 @@ function startCountdown() {
   }, 1000);
 }
 
-// Progress bar reset
 function resetProgressBar() {
   const bar = document.getElementById("progressBar");
   bar.style.animation = 'none';
@@ -358,132 +301,109 @@ function resetProgressBar() {
   bar.style.animation = 'countdown 15s linear forwards';
 }
 
-// Background color logic
-function updateBackground(nextSeconds) {
-  document.body.classList.remove("bg-red","bg-amber","bg-green","bg-yellow");
-  if (nextSeconds == null || nextSeconds > 360) document.body.classList.add("bg-red");
-  else if (nextSeconds < 120) document.body.classList.add("bg-yellow");
-  else if (nextSeconds >= 270 && nextSeconds <= 360) document.body.classList.add("bg-amber");
-  else document.body.classList.add("bg-green");
+const url = `https://api.tfl.gov.uk/StopPoint/490010849N/Arrivals`;
+
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+  } catch (err) {}
 }
 
-// ────────────────────────────────────────────────
-//  TUBE & SWR STATUS
-// ────────────────────────────────────────────────
+function updateBackground(nextSeconds) {
+  document.body.classList.remove("bg-red","bg-amber","bg-green","bg-yellow");
 
-async function fetchTubeAndSWR() {
-  try {
-    // Tube
-    const tubeRes = await fetch("https://api.tfl.gov.uk/Line/Mode/tube/Status");
-    if (tubeRes.ok) tubeData = await tubeRes.json();
-
-    // SWR
-    const swrRes = await fetch("https://api.tfl.gov.uk/Line/southwesternrailway/Status");
-    if (swrRes.ok) swrData = await swrRes.json();
-
-    renderCriticalLines();
-    renderSWRStatus();
-    if (document.getElementById("tubeFull").style.display !== "none") {
-      renderAllTubeLines();
-    }
-  } catch (err) {
-    console.error("Status fetch failed:", err);
+  if (nextSeconds == null || nextSeconds > 360) {
+    document.body.classList.add("bg-red");
+  } else if (nextSeconds < 120) {
+    document.body.classList.add("bg-yellow");
+  } else if (nextSeconds >= 270 && nextSeconds <= 360) {
+    document.body.classList.add("bg-amber");
+  } else {
+    document.body.classList.add("bg-green");
   }
 }
 
-function renderCriticalLines() {
-  const container = document.getElementById("tubeCritical");
-  container.innerHTML = "";
+async function load() {
+  document.getElementById("errorMsg").textContent = "";
+  resetProgressBar();
 
-  const critical = tubeData?.filter(l => l.id === "northern" || l.id === "victoria") || [];
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`API ${r.status}`);
+    const data = await r.json();
 
-  critical.forEach(line => {
-    const status = line.lineStatuses?.[0];
-    if (!status) return;
-    const colour = lineColours[line.id] || "#666";
-    const isDelayed = status.statusSeverity < 10;
+    const buses = data
+      .filter(b => b.lineName === "413")
+      .sort((a, b) => a.timeToStation - b.timeToStation)
+      .slice(0, 3);
 
-    const div = document.createElement("div");
-    div.className = "tube-critical";
-    div.style.background = isDelayed ? "#8B0000" : "#006400";
-    div.innerHTML = `
-      <div style="width:32px;height:32px;background:${colour};border-radius:50%;"></div>
-      <div style="flex:1;">
-        <strong>${line.name}</strong><br>
-        <span style="font-size:15px;">${status.statusSeverityDescription}</span>
-        ${isDelayed && status.reason ? `<div style="font-size:13px;margin-top:4px;">${status.reason}</div>` : ''}
-      </div>
-    `;
-    container.appendChild(div);
-  });
+    let newChange = null;
+    if (buses.length > 0 && previousTimes.length > 0) {
+      const oldNearest = previousTimes[0];
+      const newNearest = buses[0].timeToStation;
+      const delta = newNearest - oldNearest;
+      newChange = getChangeMarker(delta);
+      changeHistory.push(newChange);
+
+      if (delta <= 0) {
+        consecutiveNoDecrease = 0;
+      } else {
+        consecutiveNoDecrease++;
+      }
+
+      if (changeHistory.length > 10) changeHistory.shift();
+    } else if (buses.length > 0) {
+      changeHistory = [];
+      consecutiveNoDecrease = 0;
+    }
+
+    previousTimes = buses.map(b => b.timeToStation);
+
+    currentBuses = buses.map(b => ({ timeToStation: b.timeToStation }));
+
+    let lat = data.length > 0 ? data[0].latitude?.toFixed(6) : null;
+    let lon = data.length > 0 ? data[0].longitude?.toFixed(6) : null;
+    document.getElementById("location").textContent = 
+      lat && lon ? `Stop location: ${lat}, ${lon}` : "Stop location: Not available";
+
+    renderBusesWithMarkers();
+    updateChart(buses.length > 0 ? buses[0].timeToStation : null);
+    startCountdown();
+
+  } catch (err) {
+    document.getElementById("buses").innerHTML = "Error loading arrivals";
+    document.getElementById("location").textContent = "Stop location: Unknown";
+    document.getElementById("errorMsg").textContent = `Failed: ${err.message}`;
+  }
 }
 
-function renderSWRStatus() {
-  const container = document.getElementById("swrStatus");
-  container.innerHTML = "";
-  container.style.display = "none";
+// Toggle graph
+document.getElementById("toggleGraphBtn").addEventListener("click", () => {
+  graphVisible = !graphVisible;
+  const container = document.getElementById("graphContainer");
+  const btn = document.getElementById("toggleGraphBtn");
+  if (graphVisible) {
+    container.classList.remove("hidden");
+    btn.textContent = "📉";
+    btn.title = "Hide graph";
+  } else {
+    container.classList.add("hidden");
+    btn.textContent = "📊";
+    btn.title = "Show graph";
+  }
+});
 
-  if (!swrData || !swrData[0]) return;
+initChart();
+load();
+setInterval(load, 15000);
 
-  const status = swrData[0].lineStatuses?.[0];
-  if (!status) return;
+document.getElementById("refreshBtn").addEventListener("click", load);
 
-  const isGood = status.statusSeverity === 10;
-  container.style.display = "flex";
-  container.style.background = isGood ? "#006400" : "#8B0000";
-
-  container.innerHTML = `
-    <div style="width:32px;height:32px;background:#00695C;border-radius:50%;"></div>
-    <div style="flex:1;">
-      <strong>South Western Railway</strong><br>
-      <span style="font-size:15px;">${status.statusSeverityDescription}</span>
-      ${!isGood && status.reason ? `<div style="font-size:13px;margin-top:4px;">${status.reason}</div>` : ''}
-    </div>
-  `;
-}
-
-function renderAllTubeLines() {
-  const container = document.getElementById("tubeLines");
-  container.innerHTML = "";
-
-  (tubeData || []).forEach(line => {
-    const status = line.lineStatuses?.[0];
-    if (!status) return;
-    const colour = lineColours[line.id] || "#666";
-
-    const div = document.createElement("div");
-    div.className = "tube-line";
-    div.style.borderLeft = `6px solid ${colour}`;
-    div.innerHTML = `
-      <strong>${line.name}</strong>
-      <span style="margin-left:auto;">${status.statusSeverityDescription}</span>
-    `;
-    div.onclick = () => showTubeModal(line);
-    container.appendChild(div);
-  });
-}
-
-function showTubeModal(line) {
-  const status = line.lineStatuses?.[0];
-  if (!status) return;
-
-  document.getElementById("modalLineName").textContent = line.name;
-  document.getElementById("modalStatus").innerHTML = `
-    <span style="background:${lineColours[line.id] || '#666'}; color:#fff; padding:4px 10px; border-radius:4px;">
-      ${status.statusSeverityDescription}
-    </span>
-  `;
-  document.getElementById("modalReason").textContent = status.reason || "No additional reason provided.";
-  document.getElementById("tubeModal").classList.add("show");
-}
-
-// ────────────────────────────────────────────────
-//  EVENT LISTENERS
-// ────────────────────────────────────────────────
-
-document.getElementById("toggleTubeBtn").addEventListener("click", () => {
-  const full = document.getElementById("tubeFull");
-  const btn = document.getElementById("toggleTubeBtn");
-  if (full.style.display === "none" || full.style.display === "") {
-    full.style.display = "block";
-    btn.textContent
+requestWakeLock();
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) requestWakeLock();
+});
+</script>
+</body>
+</html>
