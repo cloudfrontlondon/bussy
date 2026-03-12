@@ -42,7 +42,7 @@ button:hover {
 
 <h1>Parkway → Morden (413)</h1>
 <div id="buses">Loading…</div>
-<button id="startButton">Start</button>
+<button id="soundToggleButton">Sound OFF</button>
 
 <script>
 const stop = "490010849N";
@@ -52,7 +52,7 @@ const url = `https://api.tfl.gov.uk/StopPoint/${stop}/Arrivals`;
 const beep = new Audio("https://www.soundjay.com/button/beep-07.wav");
 beep.load(); // Preload the audio
 
-let intervalId = null; // Store the interval ID
+let soundEnabled = false; // Track if sound is currently enabled
 
 // Prevent Screen Lock
 let wakeLock = null;
@@ -70,6 +70,7 @@ async function requestWakeLock() {
 }
 
 async function load() {
+  // Fetch bus data
   const r = await fetch(url);
   const data = await r.json();
 
@@ -90,7 +91,8 @@ async function load() {
     }
   });
 
-  if (shouldBeep) {
+  // Play sound if enabled and a bus is less than 5 minutes away
+  if (soundEnabled && shouldBeep) {
     beep.play().catch(err => console.error("Error playing beep:", err)); // Handle autoplay blocking errors
   }
 
@@ -99,28 +101,24 @@ async function load() {
   document.getElementById("buses").innerHTML = html;
 }
 
-// Add event listener to the button
-document.getElementById("startButton").addEventListener("click", () => {
-  // Hide the start button
-  document.getElementById("startButton").style.display = "none";
+// Toggle sound on/off
+document.getElementById("soundToggleButton").addEventListener("click", () => {
+  soundEnabled = !soundEnabled; // Toggle sound state
 
-  // Request wake lock
-  requestWakeLock();
-
-  // Start loading data
-  load();
-  intervalId = setInterval(load, 15000);
+  // Update button text based on sound state
+  const button = document.getElementById("soundToggleButton");
+  button.textContent = soundEnabled ? "Sound ON" : "Sound OFF";
 });
 
-// Stop the interval if the page is hidden
+// Automatically load and refresh data every 15 seconds
+load();
+setInterval(load, 15000);
+
+// Request wake lock to prevent screen locking when page is open
+requestWakeLock();
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    clearInterval(intervalId); // Stop refreshing if the page is hidden
-    console.log("Stopped data refresh because the page is hidden.");
-  } else {
-    requestWakeLock(); // Re-acquire the wake lock
-    load(); // Load instantly once the page is back in focus
-    intervalId = setInterval(load, 15000);
+  if (!document.hidden) {
+    requestWakeLock();
   }
 });
 </script>
