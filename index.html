@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <title>413 – Parkway</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body {
   font-family: -apple-system, system-ui;
@@ -12,7 +14,10 @@ body {
   text-align: center;
   margin: 0;
   padding: 20px;
+  padding-bottom: 180px; /* more space for taller graph + thicker bar */
   transition: background-color 0.8s ease;
+  position: relative;
+  min-height: 100vh;
 }
 h1 { 
   font-size: 24px; 
@@ -34,24 +39,26 @@ h1 {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
+.location, .error-msg {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #ccc;
+}
+.error-msg { color: #ff6666; }
 button {
-  margin-top: 20px;
+  margin: 12px 8px;
   padding: 10px 20px;
   font-size: 16px;
   background-color: #007ACC;
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
 }
 button:hover {
   background-color: #005f99;
-}
-#audioStatus {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #888;
 }
 
 /* Color classes */
@@ -62,6 +69,41 @@ button:hover {
 /* Icon sizing */
 .icon { width: 32px; height: 32px; }
 .update-icon { width: 16px; height: 16px; fill: #aaa; }
+
+/* Progress bar - thicker */
+.progress-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  z-index: 10;
+}
+.progress-bar {
+  height: 100%;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.7);
+  transform-origin: left;
+  animation: countdown 15s linear forwards;
+}
+@keyframes countdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+/* Graph - taller */
+#graphContainer {
+  position: fixed;
+  bottom: 20px;
+  left: 10px;
+  right: 10px;
+  height: 160px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+}
 </style>
 </head>
 
@@ -76,17 +118,86 @@ button:hover {
 <h1>Parkway → Morden (413)</h1>
 
 <div id="buses">Loading…</div>
+<div id="location" class="location">Stop location: Loading…</div>
+<div id="errorMsg" class="error-msg"></div>
 
-<button id="soundToggleButton">Sound OFF</button>
-<div id="audioStatus">Audio: Not ready</div>
+<button id="refreshBtn">Refresh Now</button>
+
+<div id="graphContainer">
+  <canvas id="etaChart"></canvas>
+</div>
+
+<div class="progress-container">
+  <div class="progress-bar" id="progressBar"></div>
+</div>
 
 <script>
+// Chart.js setup
+let etaChart;
+const etaHistory = [];
+const MAX_POINTS = 20;
+
+function initChart() {
+  const ctx = document.getElementById('etaChart').getContext('2d');
+  etaChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Nearest bus ETA (seconds)',
+        data: [],
+        borderColor: '#4CAF50',
+        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { 
+          beginAtZero: true, 
+          title: { display: true, text: 'Seconds', color: '#fff' }, 
+          ticks: { color: '#aaa' } 
+        },
+        x: { title: { display: false }, ticks: { color: '#aaa', maxTicksLimit: 6 } }
+      },
+      plugins: {
+        legend: { labels: { color: '#fff' } }
+      }
+    }
+  });
+}
+
+function updateChart(seconds) {
+  if (seconds === null) return;
+  
+  etaHistory.push({ time: new Date(), seconds });
+  if (etaHistory.length > MAX_POINTS) etaHistory.shift();
+
+  etaChart.data.labels = etaHistory.map((_, i) => `${i + 1}`);
+  etaChart.data.datasets[0].data = etaHistory.map(h => h.seconds);
+  etaChart.update();
+}
+
+function resetProgressBar() {
+  const bar = document.getElementById("progressBar");
+  bar.style.animation = 'none';
+  void bar.offsetWidth; // trigger reflow
+  bar.style.animation = 'countdown 15s linear forwards';
+}
+
+function formatTime(seconds) {
+  if (seconds < 0) return "0 min 0 s";
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins} min ${secs} s`;
+}
+
 const stop = "490010849N";
 const url = `https://api.tfl.gov.uk/StopPoint/${stop}/Arrivals`;
-
-let audioCtx = null;
-let soundEnabled = false;
-let silentOscillator = null;
 
 let wakeLock = null;
 async function requestWakeLock() {
@@ -98,62 +209,6 @@ async function requestWakeLock() {
   } catch (err) {
     console.error("Wake lock failed:", err);
   }
-}
-
-function updateAudioStatus() {
-  const statusEl = document.getElementById("audioStatus");
-  if (!audioCtx) {
-    statusEl.textContent = "Audio: Not initialized";
-  } else {
-    statusEl.textContent = `Audio: ${audioCtx.state}${soundEnabled ? ' (enabled)' : ''}`;
-  }
-}
-
-function initAudio() {
-  if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  
-  silentOscillator = audioCtx.createOscillator();
-  silentOscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
-  const gainNode = audioCtx.createGain();
-  gainNode.gain.value = 0;
-  silentOscillator.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-  silentOscillator.start();
-  
-  updateAudioStatus();
-}
-
-async function ensureAudioRunning() {
-  if (!audioCtx) return;
-  if (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted') {
-    try {
-      await audioCtx.resume();
-      console.log("Audio context resumed");
-    } catch (err) {
-      console.error("Resume failed:", err);
-    }
-  }
-  updateAudioStatus();
-}
-
-function playBeep() {
-  if (!audioCtx || audioCtx.state !== 'running') return;
-  
-  const osc = audioCtx.createOscillator();
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.15);
-  
-  const gainNode = audioCtx.createGain();
-  gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-  
-  osc.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-  
-  osc.start();
-  osc.stop(audioCtx.currentTime + 0.25);
 }
 
 function updateBackground(nextSeconds) {
@@ -169,10 +224,17 @@ function updateBackground(nextSeconds) {
   }
 }
 
-async function load() {
+async function load(force = false) {
+  const errorEl = document.getElementById("errorMsg");
+  errorEl.textContent = "";
+
+  resetProgressBar();
+
   try {
     const r = await fetch(url);
-    if (!r.ok) throw new Error("API error");
+    if (!r.ok) {
+      throw new Error(`API ${r.status} ${r.statusText}`);
+    }
     const data = await r.json();
 
     const buses = data
@@ -181,74 +243,68 @@ async function load() {
       .slice(0, 3);
 
     let html = "";
-    let shouldBeep = false;
     let nextSeconds = null;
+    let lat = null;
+    let lon = null;
 
-    buses.forEach((bus, i) => {
+    if (data.length > 0) {
+      lat = data[0].latitude?.toFixed(6);
+      lon = data[0].longitude?.toFixed(6);
+    }
+
+    buses.forEach((bus) => {
       const sec = bus.timeToStation;
-      const min = Math.round(sec / 60);
-      html += `<div class="bus">${min} min</div>`;
+      html += `<div class="bus">${formatTime(sec)}</div>`;
 
-      if (i === 0) nextSeconds = sec;
-      // Changed for testing: beep if next bus < 30 minutes
-      if (sec < 1800) shouldBeep = true;
+      if (nextSeconds === null || sec < nextSeconds) nextSeconds = sec;
     });
 
     if (buses.length === 0) {
-      html = '<div class="bus">No 413 buses right now</div>';
-      nextSeconds = null;
+      html = '<div class="bus">No 413 buses scheduled right now</div>';
+      if (data.length > 0) {
+        html += '<div class="small">(Other routes may be serving this stop)</div>';
+      }
     }
-
-    html += `<div class="small">
-      <svg class="update-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-      </svg>
-      Updated ${new Date().toLocaleTimeString()}
-    </div>`;
 
     document.getElementById("buses").innerHTML = html;
 
-    updateBackground(nextSeconds);
-
-    if (soundEnabled && shouldBeep) {
-      await ensureAudioRunning();
-      playBeep();
+    const locEl = document.getElementById("location");
+    if (lat && lon) {
+      locEl.textContent = `Stop location: ${lat}, ${lon}`;
+    } else {
+      locEl.textContent = "Stop location: Not available";
     }
 
+    updateBackground(nextSeconds);
+
+    updateChart(nextSeconds);
+
   } catch (err) {
-    document.getElementById("buses").innerHTML = "Error loading data";
     console.error(err);
+    document.getElementById("buses").innerHTML = "Error loading arrivals";
+    document.getElementById("location").textContent = "Stop location: Unknown";
+    errorEl.textContent = `Failed: ${err.message}. TfL may be busy – retrying soon.`;
   }
 }
 
-// Toggle + force re-init/resume on tap
-document.getElementById("soundToggleButton").addEventListener("click", async () => {
-  soundEnabled = !soundEnabled;
-  const button = document.getElementById("soundToggleButton");
-  button.textContent = soundEnabled ? "Sound ON" : "Sound OFF";
+// Init chart
+initChart();
 
-  if (soundEnabled) {
-    initAudio();
-    await ensureAudioRunning();
-  }
-  updateAudioStatus();
-});
-
-// Resume audio when page becomes visible
-document.addEventListener("visibilitychange", async () => {
-  if (!document.hidden) {
-    requestWakeLock();
-    if (soundEnabled && audioCtx) {
-      await ensureAudioRunning();
-    }
-  }
-});
-
+// Auto-refresh every 15 seconds
 load();
-setInterval(load, 15000);
+const refreshInterval = setInterval(() => load(), 15000);
+
+// Manual refresh button
+document.getElementById("refreshBtn").addEventListener("click", () => {
+  load(true);
+});
 
 requestWakeLock();
-updateAudioStatus();
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    requestWakeLock();
+  }
+});
 </script>
 
 </body>
