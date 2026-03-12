@@ -18,13 +18,16 @@ body {
   position: relative;
   min-height: 100vh;
 }
-h1 { 
-  font-size: 24px; 
-  margin-bottom: 10px; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  gap: 10px;
+header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+h1 {
+  font-size: 26px;
+  margin: 0;
 }
 .bus-line {
   margin: 20px 0;
@@ -52,6 +55,12 @@ h1 {
 .marker.same   { background: #444; color: #aaa; }
 .marker.up     { background: #8B0000; color: #fff; }
 .marker.down   { background: #006400; color: #fff; }
+.warning {
+  font-size: 28px;
+  color: #ff4444;
+  margin-left: 12px;
+  align-self: center;
+}
 .small {
   color: #aaa;
   font-size: 14px;
@@ -79,13 +88,14 @@ button {
 }
 button:hover { background-color: #005f99; }
 
-/* Colors */
+/* Updated colors */
 .bg-red    { background-color: #8B0000; }
 .bg-amber  { background-color: #FF8C00; }
-.bg-green  { background-color: #006400; }
+.bg-green  { background-color: #32CD32; } /* brighter green */
+.bg-yellow { background-color: #FFD700; } /* urgent <2 min */
 
 /* Icons & progress */
-.icon { width: 32px; height: 32px; }
+.icon { width: 40px; height: 40px; }
 .progress-container {
   position: fixed;
   bottom: 0;
@@ -124,12 +134,13 @@ button:hover { background-color: #005f99; }
 
 <body class="bg-red">
 
-<svg class="icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="fill:#ff0000;">
-  <path d="M480 192H32c-17.7 0-32 14.3-32 32v96c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-96c0-17.7-14.3-32-32-32zM96 352c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm320 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zM480 96H32C14.3 96 0 110.3 0 128v32c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32z"/>
-  <rect x="64" y="64" width="384" height="128" fill="#ffffff"/>
-</svg>
-
-<h1>Parkway → Morden (413)</h1>
+<header>
+  <svg class="icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="fill:#ff0000;">
+    <path d="M480 192H32c-17.7 0-32 14.3-32 32v96c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-96c0-17.7-14.3-32-32-32zM96 352c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm320 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zM480 96H32C14.3 96 0 110.3 0 128v32c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32z"/>
+    <rect x="64" y="64" width="384" height="128" fill="#ffffff"/>
+  </svg>
+  <h1>Parkway → Morden (413)</h1>
+</header>
 
 <div id="buses">Loading…</div>
 <div id="location" class="location">Stop location: Loading…</div>
@@ -152,7 +163,8 @@ const MAX_POINTS = 20;
 let countdownInterval = null;
 let currentBuses = [];
 let previousTimes = [];
-let changeHistory = []; // array of {symbol, class} objects, newest at the end
+let changeHistory = []; // newest at the end
+let consecutiveNoDecrease = 0;
 
 function initChart() {
   const ctx = document.getElementById('etaChart').getContext('2d');
@@ -209,20 +221,28 @@ function renderBusesWithMarkers() {
   currentBuses.forEach((bus, i) => {
     const timeStr = formatTime(bus.timeToStation);
     let markersHtml = "";
+    let warningHtml = "";
 
-    // Show change history only under the nearest bus (index 0)
-    if (i === 0 && changeHistory.length > 0) {
-      markersHtml = '<div class="change-markers">';
-      // Show up to the last 10 (most recent on right)
-      changeHistory.slice(-10).forEach(ch => {
-        markersHtml += `<span class="marker ${ch.class}">${ch.symbol}</span>`;
-      });
-      markersHtml += '</div>';
+    if (i === 0) {
+      // Change history under nearest bus
+      if (changeHistory.length > 0) {
+        markersHtml = '<div class="change-markers">';
+        changeHistory.slice(-10).forEach(ch => {
+          markersHtml += `<span class="marker ${ch.class}">${ch.symbol}</span>`;
+        });
+        markersHtml += '</div>';
+      }
+
+      // Warning if 8+ consecutive same/up
+      if (consecutiveNoDecrease >= 8) {
+        warningHtml = '<span class="warning">⚠️</span>';
+      }
     }
 
     html += `<div class="bus-line">
       <div class="bus">${timeStr}</div>
       ${markersHtml}
+      ${warningHtml}
     </div>`;
 
     if (nextSeconds === null || bus.timeToStation < nextSeconds) nextSeconds = bus.timeToStation;
@@ -263,10 +283,17 @@ async function requestWakeLock() {
 }
 
 function updateBackground(nextSeconds) {
-  document.body.classList.remove("bg-red","bg-amber","bg-green");
-  if (nextSeconds == null || nextSeconds > 360) document.body.classList.add("bg-red");
-  else if (nextSeconds >= 270 && nextSeconds <= 360) document.body.classList.add("bg-amber");
-  else document.body.classList.add("bg-green");
+  document.body.classList.remove("bg-red", "bg-amber", "bg-green", "bg-yellow");
+
+  if (nextSeconds == null || nextSeconds > 360) {
+    document.body.classList.add("bg-red");
+  } else if (nextSeconds < 120) {
+    document.body.classList.add("bg-yellow");
+  } else if (nextSeconds >= 270 && nextSeconds <= 360) {
+    document.body.classList.add("bg-amber");
+  } else {
+    document.body.classList.add("bg-green");
+  }
 }
 
 async function load() {
@@ -283,7 +310,7 @@ async function load() {
       .sort((a, b) => a.timeToStation - b.timeToStation)
       .slice(0, 3);
 
-    // Delta calculation for nearest bus
+    // Delta & consecutive tracking
     let newChange = null;
     if (buses.length > 0 && previousTimes.length > 0) {
       const oldNearest = previousTimes[0];
@@ -291,10 +318,17 @@ async function load() {
       const delta = newNearest - oldNearest;
       newChange = getChangeMarker(delta);
       changeHistory.push(newChange);
-      // Keep only the last 10
+
+      if (delta <= 0) {
+        consecutiveNoDecrease = 0; // reset on any decrease
+      } else {
+        consecutiveNoDecrease++;
+      }
+
       if (changeHistory.length > 10) changeHistory.shift();
     } else if (buses.length > 0) {
       changeHistory = [];
+      consecutiveNoDecrease = 0;
     }
 
     previousTimes = buses.map(b => b.timeToStation);
