@@ -22,6 +22,19 @@ h1 { font-size: 22px; margin-bottom: 20px; }
   color: #aaa;
   font-size: 14px;
 }
+button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007ACC;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button:hover {
+  background-color: #005f99;
+}
 </style>
 </head>
 
@@ -29,6 +42,7 @@ h1 { font-size: 22px; margin-bottom: 20px; }
 
 <h1>Parkway → Morden (413)</h1>
 <div id="buses">Loading…</div>
+<button id="startButton">Start</button>
 
 <script>
 const stop = "490010849N";
@@ -36,6 +50,9 @@ const url = `https://api.tfl.gov.uk/StopPoint/${stop}/Arrivals`;
 
 // Load sound for the beep
 const beep = new Audio("https://www.soundjay.com/button/beep-07.wav");
+beep.load(); // Preload the audio
+
+let intervalId = null; // Store the interval ID
 
 // Prevent Screen Lock
 let wakeLock = null;
@@ -74,7 +91,7 @@ async function load() {
   });
 
   if (shouldBeep) {
-    beep.play(); // Play beep sound if any bus is less than 5 minutes away
+    beep.play().catch(err => console.error("Error playing beep:", err)); // Handle autoplay blocking errors
   }
 
   html += `<div class="small">Updated ${new Date().toLocaleTimeString()}</div>`;
@@ -82,14 +99,28 @@ async function load() {
   document.getElementById("buses").innerHTML = html;
 }
 
-// Initial load and refresh every 15 seconds
-load();
-setInterval(load, 15000);
+// Add event listener to the button
+document.getElementById("startButton").addEventListener("click", () => {
+  // Hide the start button
+  document.getElementById("startButton").style.display = "none";
 
-// Request wake lock when the page is in focus
+  // Request wake lock
+  requestWakeLock();
+
+  // Start loading data
+  load();
+  intervalId = setInterval(load, 15000);
+});
+
+// Stop the interval if the page is hidden
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
-    requestWakeLock();
+  if (document.hidden) {
+    clearInterval(intervalId); // Stop refreshing if the page is hidden
+    console.log("Stopped data refresh because the page is hidden.");
+  } else {
+    requestWakeLock(); // Re-acquire the wake lock
+    load(); // Load instantly once the page is back in focus
+    intervalId = setInterval(load, 15000);
   }
 });
 </script>
