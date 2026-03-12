@@ -21,9 +21,15 @@ body {
 header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  justify-content: space-between;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 h1 {
   font-size: 26px;
@@ -76,23 +82,33 @@ h1 {
   color: #ccc;
 }
 .error-msg { color: #ff6666; }
-button {
-  margin: 12px 8px;
-  padding: 10px 20px;
-  font-size: 16px;
-  background-color: #007ACC;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-button:hover { background-color: #005f99; }
 
-/* Updated colors */
+/* Transparent icon buttons */
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.2s;
+}
+.icon-btn:hover,
+.icon-btn:focus {
+  background: rgba(255,255,255,0.15);
+  outline: none;
+}
+
+/* Colors */
 .bg-red    { background-color: #8B0000; }
 .bg-amber  { background-color: #FF8C00; }
-.bg-green  { background-color: #32CD32; } /* brighter green */
-.bg-yellow { background-color: #FFD700; } /* urgent <2 min */
+.bg-green  { background-color: #32CD32; }
+.bg-yellow { background-color: #FFD700; }
 
 /* Icons & progress */
 .icon { width: 40px; height: 40px; }
@@ -128,6 +144,14 @@ button:hover { background-color: #005f99; }
   border-radius: 8px;
   padding: 10px;
   box-sizing: border-box;
+  transition: opacity 0.3s ease, height 0.3s ease, padding 0.3s ease;
+}
+#graphContainer.hidden {
+  opacity: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
 }
 </style>
 </head>
@@ -135,18 +159,23 @@ button:hover { background-color: #005f99; }
 <body class="bg-red">
 
 <header>
-  <svg class="icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="fill:#ff0000;">
-    <path d="M480 192H32c-17.7 0-32 14.3-32 32v96c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-96c0-17.7-14.3-32-32-32zM96 352c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm320 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zM480 96H32C14.3 96 0 110.3 0 128v32c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32z"/>
-    <rect x="64" y="64" width="384" height="128" fill="#ffffff"/>
-  </svg>
-  <h1>Parkway → Morden (413)</h1>
+  <div class="header-left">
+    <svg class="icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="fill:#ff0000;">
+      <path d="M480 192H32c-17.7 0-32 14.3-32 32v96c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-96c0-17.7-14.3-32-32-32zM96 352c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm320 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zM480 96H32C14.3 96 0 110.3 0 128v32c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32z"/>
+      <rect x="64" y="64" width="384" height="128" fill="#ffffff"/>
+    </svg>
+    <h1>Parkway → Morden (413)</h1>
+  </div>
+
+  <div style="display: flex; gap: 8px;">
+    <button id="toggleGraphBtn" class="icon-btn" title="Toggle graph">📊</button>
+    <button id="refreshBtn" class="icon-btn" title="Refresh now">🔄</button>
+  </div>
 </header>
 
 <div id="buses">Loading…</div>
 <div id="location" class="location">Stop location: Loading…</div>
 <div id="errorMsg" class="error-msg"></div>
-
-<button id="refreshBtn">Refresh Now</button>
 
 <div id="graphContainer">
   <canvas id="etaChart"></canvas>
@@ -163,8 +192,9 @@ const MAX_POINTS = 20;
 let countdownInterval = null;
 let currentBuses = [];
 let previousTimes = [];
-let changeHistory = []; // newest at the end
+let changeHistory = [];
 let consecutiveNoDecrease = 0;
+let graphVisible = true;
 
 function initChart() {
   const ctx = document.getElementById('etaChart').getContext('2d');
@@ -224,7 +254,6 @@ function renderBusesWithMarkers() {
     let warningHtml = "";
 
     if (i === 0) {
-      // Change history under nearest bus
       if (changeHistory.length > 0) {
         markersHtml = '<div class="change-markers">';
         changeHistory.slice(-10).forEach(ch => {
@@ -233,7 +262,6 @@ function renderBusesWithMarkers() {
         markersHtml += '</div>';
       }
 
-      // Warning if 8+ consecutive same/up
       if (consecutiveNoDecrease >= 8) {
         warningHtml = '<span class="warning">⚠️</span>';
       }
@@ -283,7 +311,7 @@ async function requestWakeLock() {
 }
 
 function updateBackground(nextSeconds) {
-  document.body.classList.remove("bg-red", "bg-amber", "bg-green", "bg-yellow");
+  document.body.classList.remove("bg-red","bg-amber","bg-green","bg-yellow");
 
   if (nextSeconds == null || nextSeconds > 360) {
     document.body.classList.add("bg-red");
@@ -310,7 +338,6 @@ async function load() {
       .sort((a, b) => a.timeToStation - b.timeToStation)
       .slice(0, 3);
 
-    // Delta & consecutive tracking
     let newChange = null;
     if (buses.length > 0 && previousTimes.length > 0) {
       const oldNearest = previousTimes[0];
@@ -320,7 +347,7 @@ async function load() {
       changeHistory.push(newChange);
 
       if (delta <= 0) {
-        consecutiveNoDecrease = 0; // reset on any decrease
+        consecutiveNoDecrease = 0;
       } else {
         consecutiveNoDecrease++;
       }
@@ -350,6 +377,22 @@ async function load() {
     document.getElementById("errorMsg").textContent = `Failed: ${err.message}`;
   }
 }
+
+// Toggle graph
+document.getElementById("toggleGraphBtn").addEventListener("click", () => {
+  graphVisible = !graphVisible;
+  const container = document.getElementById("graphContainer");
+  const btn = document.getElementById("toggleGraphBtn");
+  if (graphVisible) {
+    container.classList.remove("hidden");
+    btn.textContent = "📉";
+    btn.title = "Hide graph";
+  } else {
+    container.classList.add("hidden");
+    btn.textContent = "📊";
+    btn.title = "Show graph";
+  }
+});
 
 initChart();
 load();
