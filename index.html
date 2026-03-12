@@ -48,6 +48,11 @@ button {
 button:hover {
   background-color: #005f99;
 }
+#audioStatus {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #888;
+}
 
 /* Color classes */
 .bg-red    { background-color: #8B0000; }
@@ -62,7 +67,7 @@ button:hover {
 
 <body class="bg-red">
 
-<!-- Inline SVG for London double-decker bus (simplified public domain style) -->
+<!-- Red double-decker bus icon -->
 <svg class="icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="fill: #ff0000;">
   <path d="M480 192H32c-17.7 0-32 14.3-32 32v96c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-96c0-17.7-14.3-32-32-32zM96 352c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm320 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zM480 96H32C14.3 96 0 110.3 0 128v32c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32z"/>
   <rect x="64" y="64" width="384" height="128" fill="#ffffff"/>
@@ -73,20 +78,15 @@ button:hover {
 <div id="buses">Loading…</div>
 
 <button id="soundToggleButton">Sound OFF</button>
-
-<!-- Inline SVG for clock icon (simple white/gray) -->
-<svg class="update-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-</svg>
+<div id="audioStatus">Audio: Not ready</div>
 
 <script>
 const stop = "490010849N";
 const url = `https://api.tfl.gov.uk/StopPoint/${stop}/Arrivals`;
 
-const beep = new Audio("https://www.soundjay.com/button/beep-07.wav");
-beep.load();
-
+let audioCtx = null;
 let soundEnabled = false;
+let silentOscillator = null;
 
 let wakeLock = null;
 async function requestWakeLock() {
@@ -100,6 +100,62 @@ async function requestWakeLock() {
   }
 }
 
+function updateAudioStatus() {
+  const statusEl = document.getElementById("audioStatus");
+  if (!audioCtx) {
+    statusEl.textContent = "Audio: Not initialized";
+  } else {
+    statusEl.textContent = `Audio: ${audioCtx.state}${soundEnabled ? ' (enabled)' : ''}`;
+  }
+}
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  silentOscillator = audioCtx.createOscillator();
+  silentOscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.value = 0;
+  silentOscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  silentOscillator.start();
+  
+  updateAudioStatus();
+}
+
+async function ensureAudioRunning() {
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted') {
+    try {
+      await audioCtx.resume();
+      console.log("Audio context resumed");
+    } catch (err) {
+      console.error("Resume failed:", err);
+    }
+  }
+  updateAudioStatus();
+}
+
+function playBeep() {
+  if (!audioCtx || audioCtx.state !== 'running') return;
+  
+  const osc = audioCtx.createOscillator();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.15);
+  
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+  
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.25);
+}
+
 function updateBackground(nextSeconds) {
   const body = document.body;
   body.classList.remove("bg-red", "bg-amber", "bg-green");
@@ -109,7 +165,7 @@ function updateBackground(nextSeconds) {
   } else if (nextSeconds >= 270 && nextSeconds <= 360) {
     body.classList.add("bg-amber");
   } else {
-    body.classList.add("bg-green"); // covers 150–269 and <150
+    body.classList.add("bg-green");
   }
 }
 
@@ -134,7 +190,8 @@ async function load() {
       html += `<div class="bus">${min} min</div>`;
 
       if (i === 0) nextSeconds = sec;
-      if (sec < 300) shouldBeep = true;
+      // Changed for testing: beep if next bus < 30 minutes
+      if (sec < 1800) shouldBeep = true;
     });
 
     if (buses.length === 0) {
@@ -144,4 +201,55 @@ async function load() {
 
     html += `<div class="small">
       <svg class="update-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+      </svg>
+      Updated ${new Date().toLocaleTimeString()}
+    </div>`;
+
+    document.getElementById("buses").innerHTML = html;
+
+    updateBackground(nextSeconds);
+
+    if (soundEnabled && shouldBeep) {
+      await ensureAudioRunning();
+      playBeep();
+    }
+
+  } catch (err) {
+    document.getElementById("buses").innerHTML = "Error loading data";
+    console.error(err);
+  }
+}
+
+// Toggle + force re-init/resume on tap
+document.getElementById("soundToggleButton").addEventListener("click", async () => {
+  soundEnabled = !soundEnabled;
+  const button = document.getElementById("soundToggleButton");
+  button.textContent = soundEnabled ? "Sound ON" : "Sound OFF";
+
+  if (soundEnabled) {
+    initAudio();
+    await ensureAudioRunning();
+  }
+  updateAudioStatus();
+});
+
+// Resume audio when page becomes visible
+document.addEventListener("visibilitychange", async () => {
+  if (!document.hidden) {
+    requestWakeLock();
+    if (soundEnabled && audioCtx) {
+      await ensureAudioRunning();
+    }
+  }
+});
+
+load();
+setInterval(load, 15000);
+
+requestWakeLock();
+updateAudioStatus();
+</script>
+
+</body>
+</html>
