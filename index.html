@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <title>413 – Parkway</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body {
@@ -14,7 +13,7 @@ body {
   text-align: center;
   margin: 0;
   padding: 20px;
-  padding-bottom: 180px; /* more space for taller graph + thicker bar */
+  padding-bottom: 200px;
   transition: background-color 0.8s ease;
   position: relative;
   min-height: 100vh;
@@ -27,11 +26,32 @@ h1 {
   justify-content: center; 
   gap: 10px;
 }
+.bus-line {
+  margin: 20px 0;
+}
 .bus {
   font-size: 48px;
-  margin: 15px 0;
   font-weight: bold;
 }
+.change-markers {
+  margin-top: 6px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+}
+.marker {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+  font-size: 18px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: bold;
+}
+.marker.same   { background: #444; color: #aaa; }
+.marker.up     { background: #8B0000; color: #fff; }
+.marker.down   { background: #006400; color: #fff; }
 .small {
   color: #aaa;
   font-size: 14px;
@@ -57,33 +77,28 @@ button {
   border-radius: 6px;
   cursor: pointer;
 }
-button:hover {
-  background-color: #005f99;
-}
+button:hover { background-color: #005f99; }
 
-/* Color classes */
+/* Colors */
 .bg-red    { background-color: #8B0000; }
 .bg-amber  { background-color: #FF8C00; }
 .bg-green  { background-color: #006400; }
 
-/* Icon sizing */
+/* Icons & progress */
 .icon { width: 32px; height: 32px; }
-.update-icon { width: 16px; height: 16px; fill: #aaa; }
-
-/* Progress bar - thicker */
 .progress-container {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   height: 8px;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255,255,255,0.15);
   z-index: 10;
 }
 .progress-bar {
   height: 100%;
   width: 100%;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255,255,255,0.7);
   transform-origin: left;
   animation: countdown 15s linear forwards;
 }
@@ -92,7 +107,7 @@ button:hover {
   to   { transform: scaleX(0); }
 }
 
-/* Graph - taller */
+/* Graph */
 #graphContainer {
   position: fixed;
   bottom: 20px;
@@ -109,8 +124,7 @@ button:hover {
 
 <body class="bg-red">
 
-<!-- Red double-decker bus icon -->
-<svg class="icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="fill: #ff0000;">
+<svg class="icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="fill:#ff0000;">
   <path d="M480 192H32c-17.7 0-32 14.3-32 32v96c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-96c0-17.7-14.3-32-32-32zM96 352c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm320 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zM480 96H32C14.3 96 0 110.3 0 128v32c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32z"/>
   <rect x="64" y="64" width="384" height="128" fill="#ffffff"/>
 </svg>
@@ -132,109 +146,136 @@ button:hover {
 </div>
 
 <script>
-// Chart.js setup
 let etaChart;
 const etaHistory = [];
 const MAX_POINTS = 20;
+let countdownInterval = null;
+let currentBuses = [];
+let previousTimes = [];
+let changeHistory = []; // array of {symbol, class} objects, newest at the end
 
 function initChart() {
   const ctx = document.getElementById('etaChart').getContext('2d');
   etaChart = new Chart(ctx, {
     type: 'line',
-    data: {
-      labels: [],
-      datasets: [{
-        label: 'Nearest bus ETA (seconds)',
-        data: [],
-        borderColor: '#4CAF50',
-        backgroundColor: 'rgba(76, 175, 80, 0.2)',
-        tension: 0.3,
-        fill: true,
-        pointRadius: 4,
-      }]
-    },
+    data: { labels: [], datasets: [{
+      label: 'Nearest bus ETA (seconds)',
+      data: [],
+      borderColor: '#4CAF50',
+      backgroundColor: 'rgba(76,175,80,0.2)',
+      tension: 0.3,
+      fill: true,
+      pointRadius: 4,
+    }]},
     options: {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        y: { 
-          beginAtZero: true, 
-          title: { display: true, text: 'Seconds', color: '#fff' }, 
-          ticks: { color: '#aaa' } 
-        },
-        x: { title: { display: false }, ticks: { color: '#aaa', maxTicksLimit: 6 } }
+        y: { beginAtZero: true, title: {display:true, text:'Seconds', color:'#fff'}, ticks:{color:'#aaa'} },
+        x: { title: {display:false}, ticks: {color:'#aaa', maxTicksLimit:8} }
       },
-      plugins: {
-        legend: { labels: { color: '#fff' } }
-      }
+      plugins: { legend: {labels:{color:'#fff'}} }
     }
   });
 }
 
 function updateChart(seconds) {
   if (seconds === null) return;
-  
   etaHistory.push({ time: new Date(), seconds });
   if (etaHistory.length > MAX_POINTS) etaHistory.shift();
 
-  etaChart.data.labels = etaHistory.map((_, i) => `${i + 1}`);
+  etaChart.data.labels = etaHistory.map(h => Math.round(h.seconds / 60) + (Math.round(h.seconds / 60) === 1 ? ' min' : ' min'));
   etaChart.data.datasets[0].data = etaHistory.map(h => h.seconds);
   etaChart.update();
+}
+
+function formatTime(seconds) {
+  if (seconds < 0) return "Due";
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins} min ${secs.toString().padStart(2,'0')} s`;
+}
+
+function getChangeMarker(delta) {
+  if (delta > 0) return {symbol: '↑', class: 'up'};
+  if (delta < 0) return {symbol: '↓', class: 'down'};
+  return {symbol: '→', class: 'same'};
+}
+
+function renderBusesWithMarkers() {
+  let html = "";
+  let nextSeconds = null;
+
+  currentBuses.forEach((bus, i) => {
+    const timeStr = formatTime(bus.timeToStation);
+    let markersHtml = "";
+
+    // Show change history only under the nearest bus (index 0)
+    if (i === 0 && changeHistory.length > 0) {
+      markersHtml = '<div class="change-markers">';
+      // Show up to the last 10 (most recent on right)
+      changeHistory.slice(-10).forEach(ch => {
+        markersHtml += `<span class="marker ${ch.class}">${ch.symbol}</span>`;
+      });
+      markersHtml += '</div>';
+    }
+
+    html += `<div class="bus-line">
+      <div class="bus">${timeStr}</div>
+      ${markersHtml}
+    </div>`;
+
+    if (nextSeconds === null || bus.timeToStation < nextSeconds) nextSeconds = bus.timeToStation;
+  });
+
+  if (currentBuses.length === 0) {
+    html = '<div class="bus">No 413 buses scheduled right now</div>';
+  }
+
+  document.getElementById("buses").innerHTML = html;
+  updateBackground(nextSeconds);
+}
+
+function startCountdown() {
+  if (countdownInterval) clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    currentBuses = currentBuses.map(b => ({
+      timeToStation: Math.max(0, b.timeToStation - 1)
+    }));
+    renderBusesWithMarkers();
+  }, 1000);
 }
 
 function resetProgressBar() {
   const bar = document.getElementById("progressBar");
   bar.style.animation = 'none';
-  void bar.offsetWidth; // trigger reflow
+  void bar.offsetWidth;
   bar.style.animation = 'countdown 15s linear forwards';
 }
 
-function formatTime(seconds) {
-  if (seconds < 0) return "0 min 0 s";
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins} min ${secs} s`;
-}
-
-const stop = "490010849N";
-const url = `https://api.tfl.gov.uk/StopPoint/${stop}/Arrivals`;
+const url = `https://api.tfl.gov.uk/StopPoint/490010849N/Arrivals`;
 
 let wakeLock = null;
 async function requestWakeLock() {
   try {
-    if ("wakeLock" in navigator) {
-      wakeLock = await navigator.wakeLock.request("screen");
-      console.log("Wake lock active.");
-    }
-  } catch (err) {
-    console.error("Wake lock failed:", err);
-  }
+    if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+  } catch (err) {}
 }
 
 function updateBackground(nextSeconds) {
-  const body = document.body;
-  body.classList.remove("bg-red", "bg-amber", "bg-green");
-
-  if (nextSeconds === null || nextSeconds > 360) {
-    body.classList.add("bg-red");
-  } else if (nextSeconds >= 270 && nextSeconds <= 360) {
-    body.classList.add("bg-amber");
-  } else {
-    body.classList.add("bg-green");
-  }
+  document.body.classList.remove("bg-red","bg-amber","bg-green");
+  if (nextSeconds == null || nextSeconds > 360) document.body.classList.add("bg-red");
+  else if (nextSeconds >= 270 && nextSeconds <= 360) document.body.classList.add("bg-amber");
+  else document.body.classList.add("bg-green");
 }
 
-async function load(force = false) {
-  const errorEl = document.getElementById("errorMsg");
-  errorEl.textContent = "";
-
+async function load() {
+  document.getElementById("errorMsg").textContent = "";
   resetProgressBar();
 
   try {
     const r = await fetch(url);
-    if (!r.ok) {
-      throw new Error(`API ${r.status} ${r.statusText}`);
-    }
+    if (!r.ok) throw new Error(`API ${r.status}`);
     const data = await r.json();
 
     const buses = data
@@ -242,70 +283,50 @@ async function load(force = false) {
       .sort((a, b) => a.timeToStation - b.timeToStation)
       .slice(0, 3);
 
-    let html = "";
-    let nextSeconds = null;
-    let lat = null;
-    let lon = null;
-
-    if (data.length > 0) {
-      lat = data[0].latitude?.toFixed(6);
-      lon = data[0].longitude?.toFixed(6);
+    // Delta calculation for nearest bus
+    let newChange = null;
+    if (buses.length > 0 && previousTimes.length > 0) {
+      const oldNearest = previousTimes[0];
+      const newNearest = buses[0].timeToStation;
+      const delta = newNearest - oldNearest;
+      newChange = getChangeMarker(delta);
+      changeHistory.push(newChange);
+      // Keep only the last 10
+      if (changeHistory.length > 10) changeHistory.shift();
+    } else if (buses.length > 0) {
+      changeHistory = [];
     }
 
-    buses.forEach((bus) => {
-      const sec = bus.timeToStation;
-      html += `<div class="bus">${formatTime(sec)}</div>`;
+    previousTimes = buses.map(b => b.timeToStation);
 
-      if (nextSeconds === null || sec < nextSeconds) nextSeconds = sec;
-    });
+    currentBuses = buses.map(b => ({ timeToStation: b.timeToStation }));
 
-    if (buses.length === 0) {
-      html = '<div class="bus">No 413 buses scheduled right now</div>';
-      if (data.length > 0) {
-        html += '<div class="small">(Other routes may be serving this stop)</div>';
-      }
-    }
+    let lat = data.length > 0 ? data[0].latitude?.toFixed(6) : null;
+    let lon = data.length > 0 ? data[0].longitude?.toFixed(6) : null;
+    document.getElementById("location").textContent = 
+      lat && lon ? `Stop location: ${lat}, ${lon}` : "Stop location: Not available";
 
-    document.getElementById("buses").innerHTML = html;
-
-    const locEl = document.getElementById("location");
-    if (lat && lon) {
-      locEl.textContent = `Stop location: ${lat}, ${lon}`;
-    } else {
-      locEl.textContent = "Stop location: Not available";
-    }
-
-    updateBackground(nextSeconds);
-
-    updateChart(nextSeconds);
+    renderBusesWithMarkers();
+    updateChart(buses.length > 0 ? buses[0].timeToStation : null);
+    startCountdown();
 
   } catch (err) {
-    console.error(err);
     document.getElementById("buses").innerHTML = "Error loading arrivals";
     document.getElementById("location").textContent = "Stop location: Unknown";
-    errorEl.textContent = `Failed: ${err.message}. TfL may be busy – retrying soon.`;
+    document.getElementById("errorMsg").textContent = `Failed: ${err.message}`;
   }
 }
 
-// Init chart
 initChart();
-
-// Auto-refresh every 15 seconds
 load();
-const refreshInterval = setInterval(() => load(), 15000);
+setInterval(load, 15000);
 
-// Manual refresh button
-document.getElementById("refreshBtn").addEventListener("click", () => {
-  load(true);
-});
+document.getElementById("refreshBtn").addEventListener("click", load);
 
 requestWakeLock();
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
-    requestWakeLock();
-  }
+  if (!document.hidden) requestWakeLock();
 });
 </script>
-
 </body>
 </html>
