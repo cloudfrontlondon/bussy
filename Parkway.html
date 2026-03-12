@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>413 – Parkway</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {
+  font-family: -apple-system, system-ui;
+  background: #000;
+  color: #fff;
+  text-align: center;
+  margin: 0;
+  padding: 20px;
+}
+h1 { font-size: 22px; margin-bottom: 20px; }
+.bus {
+  font-size: 40px;
+  margin: 15px 0;
+}
+.small {
+  color: #aaa;
+  font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Parkway → Morden (413)</h1>
+<div id="buses">Loading…</div>
+
+<script>
+const stop = "490010849N";
+const url = `https://api.tfl.gov.uk/StopPoint/${stop}/Arrivals`;
+
+async function load() {
+  const r = await fetch(url);
+  const data = await r.json();
+
+  const buses = data
+    .filter(b => b.lineName === "413")
+    .sort((a,b) => a.timeToStation - b.timeToStation)
+    .slice(0,3);
+
+  let html = "";
+
+  buses.forEach(bus => {
+    const min = Math.round(bus.timeToStation / 60);
+    html += `<div class="bus">${min} min</div>`;
+  });
+
+  html += `<div class="small">Updated ${new Date().toLocaleTimeString()}</div>`;
+
+  document.getElementById("buses").innerHTML = html;
+}
+
+load();
+setInterval(load,15000);
+</script>
+
+</body>
+</html>
