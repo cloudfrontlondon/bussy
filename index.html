@@ -34,29 +34,64 @@ h1 { font-size: 22px; margin-bottom: 20px; }
 const stop = "490010849N";
 const url = `https://api.tfl.gov.uk/StopPoint/${stop}/Arrivals`;
 
+// Load sound for the beep
+const beep = new Audio("https://www.soundjay.com/button/beep-07.wav");
+
+// Prevent Screen Lock
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLock = await navigator.wakeLock.request("screen");
+      console.log("Wake lock is active.");
+    } else {
+      console.log("Wake Lock API is not supported in this browser.");
+    }
+  } catch (err) {
+    console.error("Failed to acquire wake lock:", err);
+  }
+}
+
 async function load() {
   const r = await fetch(url);
   const data = await r.json();
 
   const buses = data
     .filter(b => b.lineName === "413")
-    .sort((a,b) => a.timeToStation - b.timeToStation)
-    .slice(0,3);
+    .sort((a, b) => a.timeToStation - b.timeToStation)
+    .slice(0, 3);
 
   let html = "";
+
+  let shouldBeep = false; // Track if we should beep
 
   buses.forEach(bus => {
     const min = Math.round(bus.timeToStation / 60);
     html += `<div class="bus">${min} min</div>`;
+    if (min < 5) {
+      shouldBeep = true;
+    }
   });
+
+  if (shouldBeep) {
+    beep.play(); // Play beep sound if any bus is less than 5 minutes away
+  }
 
   html += `<div class="small">Updated ${new Date().toLocaleTimeString()}</div>`;
 
   document.getElementById("buses").innerHTML = html;
 }
 
+// Initial load and refresh every 15 seconds
 load();
-setInterval(load,15000);
+setInterval(load, 15000);
+
+// Request wake lock when the page is in focus
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    requestWakeLock();
+  }
+});
 </script>
 
 </body>
