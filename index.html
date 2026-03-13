@@ -551,7 +551,10 @@ function resetProgressBar() {
 function startCountdown() {
   if (countdownInterval) clearInterval(countdownInterval);
   countdownInterval = setInterval(() => {
-    currentBuses = currentBuses.map(b => ({ timeToStation: Math.max(0, b.timeToStation - 1) }));
+    currentBuses = currentBuses.map(b => ({
+      timeToStation: Math.max(0, b.timeToStation - 1),
+      vehicleId: b.vehicleId
+    }));
     renderBuses();
   }, 1000);
 }
