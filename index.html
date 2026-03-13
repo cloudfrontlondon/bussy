@@ -118,12 +118,19 @@
   .marker.down  { background: #14532d; color: #86efac; }
   .warning { color: #ff4444; font-size: 20px; margin-left: 6px; }
   .bus-plate {
+    display: inline-block;
     font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    color: #aaa;
-    letter-spacing: 2px;
-    margin-top: 2px;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    color: #111;
+    background: #f5c400;
+    border: 2px solid #111;
+    border-radius: 4px;
+    padding: 3px 10px 3px 10px;
+    margin-top: 6px;
     min-height: 18px;
+    text-transform: uppercase;
   }
   .bus-footer { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
@@ -412,9 +419,14 @@
 // ── Constants ──
 const BUS_STOP = '490010849N';
 const BUS_URL  = `https://api.tfl.gov.uk/StopPoint/${BUS_STOP}/Arrivals`;
+// Morden Park Baptist Church — 2 stops before Parkway. Green suppressed until bus clears this.
+const CHECKPOINT_STOP = '490009424N';
+const CHECKPOINT_URL  = `https://api.tfl.gov.uk/StopPoint/${CHECKPOINT_STOP}/Arrivals`;
 const TUBE_LINES_URL = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
-// TfL correct ID for South Western Railway is 'south-western-railway'
 const SW_RAIL_URL = 'https://api.tfl.gov.uk/Line/south-western-railway/Status';
+
+// vehicleIds still expected at checkpoint (haven't passed it yet)
+let vehiclesStillBeforeCheckpoint = new Set();
 
 // Tube line colours for pill
 const TUBE_COLOURS = {
@@ -497,12 +509,23 @@ function getChangeMarker(delta) {
   return { symbol: '→', cls: 'same' };
 }
 
-function updateBackground(nextSeconds) {
+function updateBackground(nextSeconds, vehicleId) {
   document.body.classList.remove("bg-red","bg-amber","bg-green","bg-yellow");
-  if (nextSeconds == null || nextSeconds > 360) document.body.classList.add("bg-red");
-  else if (nextSeconds < 120)                   document.body.classList.add("bg-yellow");
-  else if (nextSeconds >= 270)                  document.body.classList.add("bg-amber");
-  else                                           document.body.classList.add("bg-green");
+  const beforeCheckpoint = vehicleId && vehiclesStillBeforeCheckpoint.has(vehicleId);
+
+  if (nextSeconds == null || nextSeconds > 360) {
+    document.body.classList.add("bg-red");
+  } else if (nextSeconds < 120) {
+    // imminent — yellow regardless (it's definitely past checkpoint by now)
+    document.body.classList.add("bg-yellow");
+  } else if (beforeCheckpoint) {
+    // in time window but not past checkpoint yet — hold at amber
+    document.body.classList.add("bg-amber");
+  } else if (nextSeconds >= 270) {
+    document.body.classList.add("bg-amber");
+  } else {
+    document.body.classList.add("bg-green");
+  }
 }
 
 function statusClass(severityCode) {
@@ -557,12 +580,15 @@ function renderBuses() {
   if (consecutiveNoDecrease >= 8) cm.innerHTML += '<span class="warning">⚠️</span>';
 
   // footer
+  const nearestVehicle = currentBuses.length > 0 ? currentBuses[0].vehicleId : null;
+  const beforeCheckpoint = nearestVehicle && vehiclesStillBeforeCheckpoint.has(nearestVehicle);
   document.getElementById('busFooter').textContent =
     currentBuses.length === 0 ? 'No 413 buses scheduled right now' :
-    currentBuses.length === 1 ? '1 bus tracked' :
-    `+${currentBuses.length - 1} following`;
+    beforeCheckpoint ? '⏳ Not yet past Morden Park Baptist Church' :
+    currentBuses.length === 1 ? '✓ Past checkpoint' :
+    `✓ Past checkpoint · +${currentBuses.length - 1} following`;
 
-  updateBackground(next);
+  updateBackground(next, currentBuses.length > 0 ? currentBuses[0].vehicleId : null);
 }
 
 async function loadBus() {
@@ -593,6 +619,25 @@ async function loadBus() {
     renderBuses();
     updateChart(buses.length > 0 ? buses[0].timeToStation : null);
     startCountdown();
+
+    // Check checkpoint: which of our tracked vehicles are still listed at Morden Park Baptist Church?
+    try {
+      const rc = await fetch(CHECKPOINT_URL);
+      if (rc.ok) {
+        const checkpointData = await rc.json();
+        const atCheckpoint = new Set(
+          checkpointData
+            .filter(b => b.lineName === '413')
+            .map(b => b.vehicleId)
+        );
+        vehiclesStillBeforeCheckpoint = atCheckpoint;
+      }
+    } catch(e) {
+      // checkpoint fetch failing silently is fine — just don't suppress green
+      vehiclesStillBeforeCheckpoint = new Set();
+    }
+    // re-render now we know checkpoint state
+    renderBuses();
   } catch(err) {
     document.getElementById('busError').textContent = `Bus error: ${err.message}`;
   }
