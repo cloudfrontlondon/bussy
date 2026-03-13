@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>413 – Parkway Transit</title>
+<title>413 – Elm Walk ↔ London</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -371,13 +371,14 @@
 
 <header>
   <div class="title-block">
-    <h1>Parkway → Morden</h1>
-    <div class="subtitle">413 · Live Departures</div>
+    <h1 id="pageTitle">Elm Walk → London</h1>
+    <div class="subtitle" id="pageSubtitle">413 · Outbound</div>
   </div>
   <div class="header-btns">
+    <button id="directionBtn" class="icon-btn" title="Reverse journey" style="font-size:20px">🔄</button>
     <button id="toggleLinesBtn" class="icon-btn" title="All tube lines">🗺️</button>
     <button id="toggleGraphBtn" class="icon-btn" title="Toggle graph">📊</button>
-    <button id="refreshBtn" class="icon-btn" title="Refresh">🔄</button>
+    <button id="refreshBtn" class="icon-btn" title="Refresh">↺</button>
   </div>
 </header>
 
@@ -392,13 +393,19 @@
 
 <!-- Bus panel -->
 <div id="busPanel">
-  <div class="section-label">🚌 Bus 413 · Northbound to Morden</div>
+  <div class="section-label" id="busLabel">🚌 Bus 413 · To Morden</div>
   <div class="bus-display" id="busDisplay">–</div>
   <div id="busPlate" class="bus-plate"></div>
   <div class="bus-secondary" id="busSecondary"></div>
   <div class="change-markers" id="changeMarkers"></div>
   <div class="bus-footer" id="busFooter"></div>
   <div class="error-msg" id="busError"></div>
+</div>
+
+<!-- Other buses — shown in return mode only -->
+<div id="otherBusesPanel" style="display:none;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;">
+  <div class="section-label">🚌 Other buses · Morden Civic Centre</div>
+  <div id="otherBusesList" style="font-size:13px;color:#ccc;margin-top:4px;">Loading…</div>
 </div>
 
 <div class="transit-grid">
@@ -422,10 +429,10 @@
   </a>
   <a class="transit-card" id="railCard"
      style="border-top-color: #e05206;"
-     href="https://www.nationalrail.co.uk/service-disruptions/"
+     href="https://www.journeycheck.com/swr/search?from=RAY&to=WAT"
      target="_blank" rel="noopener">
     <div class="tc-label">🚆 SW Rail</div>
-    <div class="tc-name">Raynes Pk → Waterloo</div>
+    <div class="tc-name" id="railCardName">Raynes Pk → Waterloo</div>
     <div class="tc-status" id="railStatus"><span class="dot dot-minor"></span>Checking…</div>
     <div class="tc-desc" id="railDesc"></div>
   </a>
@@ -450,20 +457,43 @@
 </div>
 
 <script>
+// ── Direction config ──
+const DIRECTIONS = {
+  outbound: {
+    title:          'Elm Walk → London',
+    subtitle:       '413 · Outbound',
+    busLabel:       '🚌 Bus 413 · To Morden',
+    busStop:        '490010849N',
+    checkpoint:     '490009424N',
+    checkpointName: 'Morden Park Baptist Church',
+    railFrom:       'RAY', railTo: 'WAT',
+    railName:       'Raynes Pk → Waterloo',
+    journeyCheck:   'https://www.journeycheck.com/swr/search?from=RAY&to=WAT',
+    showOtherBuses: false,
+  },
+  return: {
+    title:          'London → Elm Walk',
+    subtitle:       '413 · Return',
+    busLabel:       '🚌 Bus 413 · To Raynes Park',
+    busStop:        '490010018J',
+    checkpoint:     '490009424S',
+    checkpointName: 'Morden Park Baptist Church',
+    railFrom:       'WAT', railTo: 'RAY',
+    railName:       'Waterloo → Raynes Pk',
+    journeyCheck:   'https://www.journeycheck.com/swr/search?from=WAT&to=RAY',
+    showOtherBuses: true,
+  }
+};
+let currentDirection = 'outbound';
+const cfg = () => DIRECTIONS[currentDirection];
+
 // ── Constants ──
-const BUS_STOP = '490010849N';
-const BUS_URL  = `https://api.tfl.gov.uk/StopPoint/${BUS_STOP}/Arrivals`;
-const CHECKPOINT_STOP = '490009424N';
-const CHECKPOINT_URL  = `https://api.tfl.gov.uk/StopPoint/${CHECKPOINT_STOP}/Arrivals`;
-const TUBE_LINES_URL = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
+const TUBE_LINES_URL  = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
 const SW_RAIL_TFL_URL = 'https://api.tfl.gov.uk/Line/south-western-railway/Status';
 
-// TransportAPI credentials from URL params — ?tapp_id=xxx&tapp_key=yyy
-// Free plan = 30 requests/day so rail refreshes every 45 mins to stay safe
 const _urlParams = new URLSearchParams(window.location.search);
 const TAPI_ID  = _urlParams.get('tapp_id');
 const TAPI_KEY = _urlParams.get('tapp_key');
-const TAPI_URL = 'https://transportapi.com/v3/uk/train/station/RAY/live.json';
 
 // vehicleIds still expected at checkpoint (haven't passed it yet)
 let vehiclesStillBeforeCheckpoint = new Set();
@@ -654,7 +684,7 @@ function renderBuses() {
   const beforeCheckpoint = nearestVehicle && vehiclesStillBeforeCheckpoint.has(nearestVehicle);
   document.getElementById('busFooter').textContent =
     currentBuses.length === 0 ? 'No 413 buses scheduled right now' :
-    beforeCheckpoint ? '⏳ Not yet past Morden Park Baptist Church' :
+    beforeCheckpoint ? `⏳ Not yet past ${cfg().checkpointName}` :
     currentBuses.length === 1 ? '✓ Past checkpoint' :
     `✓ Past checkpoint · +${currentBuses.length - 1} following`;
 
@@ -665,7 +695,7 @@ async function loadBus() {
   resetProgressBar();
   document.getElementById('busError').textContent = '';
   try {
-    const r = await fetch(BUS_URL);
+    const r = await fetch(`https://api.tfl.gov.uk/StopPoint/${cfg().busStop}/Arrivals`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
 
@@ -673,6 +703,16 @@ async function loadBus() {
       .filter(b => b.lineName === '413')
       .sort((a,b) => a.timeToStation - b.timeToStation)
       .slice(0, 3);
+
+    // Other buses (return mode only)
+    if (cfg().showOtherBuses) {
+      const others = data
+        .filter(b => b.lineName !== '413')
+        .sort((a,b) => a.timeToStation - b.timeToStation)
+        .slice(0, 6);
+      renderOtherBuses(others);
+    }
+    document.getElementById('otherBusesPanel').style.display = cfg().showOtherBuses ? 'block' : 'none';
 
     if (buses.length > 0 && previousTimes.length > 0) {
       const delta = buses[0].timeToStation - previousTimes[0];
@@ -690,20 +730,16 @@ async function loadBus() {
     updateChart(buses.length > 0 ? buses[0].timeToStation : null);
     startCountdown();
 
-    // Check checkpoint: which of our tracked vehicles are still listed at Morden Park Baptist Church?
+    // Check checkpoint: which vehicles are still upstream?
     try {
-      const rc = await fetch(CHECKPOINT_URL);
+      const rc = await fetch(`https://api.tfl.gov.uk/StopPoint/${cfg().checkpoint}/Arrivals`);
       if (rc.ok) {
         const checkpointData = await rc.json();
-        const atCheckpoint = new Set(
-          checkpointData
-            .filter(b => b.lineName === '413')
-            .map(b => b.vehicleId)
+        vehiclesStillBeforeCheckpoint = new Set(
+          checkpointData.filter(b => b.lineName === '413').map(b => b.vehicleId)
         );
-        vehiclesStillBeforeCheckpoint = atCheckpoint;
       }
     } catch(e) {
-      // checkpoint fetch failing silently is fine — just don't suppress green
       vehiclesStillBeforeCheckpoint = new Set();
     }
     // re-render now we know checkpoint state
@@ -714,16 +750,31 @@ async function loadBus() {
 }
 
 // ── Rail loaders ──
+function renderOtherBuses(buses) {
+  const el = document.getElementById('otherBusesList');
+  if (!el) return;
+  if (!buses.length) { el.textContent = 'No other buses right now'; return; }
+  el.innerHTML = buses.map(b => {
+    const mins = Math.floor(b.timeToStation / 60);
+    const secs = b.timeToStation % 60;
+    const time = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+      <span><strong style="font-size:15px">${b.lineName}</strong> <span style="color:#888;font-size:12px">→ ${b.destinationName}</span></span>
+      <span style="font-family:'DM Mono',monospace;font-size:13px">${time}</span>
+    </div>`;
+  }).join('');
+}
+
 async function loadRailFromTransportAPI() {
-  const url = `${TAPI_URL}?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=WAT&train_status=passenger&type=departure`;
+  const { railFrom, railTo, journeyCheck } = cfg();
+  const station = railFrom;
+  const url = `https://transportapi.com/v3/uk/train/station/${station}/live.json?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=${railTo}&train_status=passenger&type=departure`;
   const r = await fetch(url);
   if (r.status === 429 || r.status === 403) throw new Error('429 quota exhausted');
   if (!r.ok) throw new Error('TransportAPI ' + r.status);
   const data = await r.json();
 
-  const services = (data.departures?.all || []).filter(s =>
-    s.operator === 'SW' && s.destination_name?.includes('Waterloo')
-  );
+  const services = (data.departures?.all || []).filter(s => s.operator === 'SW');
 
   if (!services.length) {
     renderLineStatus('railStatus', 'railDesc', 10, 'No upcoming SWR departures', 'railCard', 'rail');
@@ -731,24 +782,22 @@ async function loadRailFromTransportAPI() {
   }
 
   const next = services[0];
-  const status = next.status; // "ON TIME", "LATE", "EARLY", "CANCELLED"
+  const status = next.status;
   const aimed  = next.aimed_departure_time;
   const expected = next.expected_departure_time;
   const minsAway = next.best_departure_estimate_mins;
 
   let severity, desc;
-
   if (status === 'CANCELLED') {
     severity = 1;
     desc = `${aimed} CANCELLED`;
   } else if (status === 'LATE') {
-    // calculate delay
     const toMins = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
     const delay = expected ? toMins(expected) - toMins(aimed) : '?';
     severity = delay >= 10 ? 3 : 6;
     desc = `${aimed} dep — ${delay} min late${minsAway != null ? ` · ${minsAway} min away` : ''}`;
   } else if (status === 'EARLY') {
-    severity = 10; // early is fine
+    severity = 10;
     desc = `${aimed} dep — running early · ${minsAway} min away`;
   } else {
     severity = 10;
@@ -756,14 +805,13 @@ async function loadRailFromTransportAPI() {
   }
 
   renderLineStatus('railStatus', 'railDesc', severity, desc, 'railCard', 'rail');
-  document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
+  document.getElementById('railCard').href = journeyCheck;
 }
 
 async function loadRailFromTfL() {
   const r = await fetch(SW_RAIL_TFL_URL);
   if (!r.ok) throw new Error('TfL rail ' + r.status);
   const railData = await r.json();
-
   const line = Array.isArray(railData) ? railData[0] : railData;
   const s = line?.lineStatuses?.[0];
   const rawSeverity = s?.statusSeverity ?? 10;
@@ -772,9 +820,8 @@ async function loadRailFromTfL() {
   const severity = isGood ? 10 : Math.min(rawSeverity, 5);
   const desc = s?.disruption?.description || s?.statusSeverityDescription || '';
   const short = desc.length > 90 ? desc.slice(0,90) + '…' : desc;
-
   renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard', 'rail');
-  document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
+  document.getElementById('railCard').href = cfg().journeyCheck;
 }
 
 
@@ -884,6 +931,33 @@ function renderAllLines(lines) {
   }).join('');
 }
 
+// ── Direction switch ──
+function switchDirection() {
+  currentDirection = currentDirection === 'outbound' ? 'return' : 'outbound';
+  const c = cfg();
+
+  // Update UI labels
+  document.getElementById('pageTitle').textContent   = c.title;
+  document.getElementById('pageSubtitle').textContent = c.subtitle;
+  document.getElementById('busLabel').textContent     = c.busLabel;
+  document.getElementById('railCardName').textContent = c.railName;
+  document.getElementById('directionBtn').title = currentDirection === 'outbound'
+    ? 'Switch to Return' : 'Switch to Outbound';
+
+  // Reset bus state
+  currentBuses = []; previousTimes = []; changeHistory = []; consecutiveNoDecrease = 0;
+  vehiclesStillBeforeCheckpoint = new Set();
+  delayState.rail = null;
+
+  // Reset rail card status
+  document.getElementById('railStatus').innerHTML = '<span class="dot dot-minor"></span>Checking…';
+  document.getElementById('railDesc').textContent = '';
+
+  // Reload everything
+  loadBus();
+  loadTubeAndRail();
+}
+
 // ── UI Toggles ──
 document.getElementById('toggleGraphBtn').addEventListener('click', () => {
   graphVisible = !graphVisible;
@@ -900,6 +974,8 @@ document.getElementById('toggleLinesBtn').addEventListener('click', () => {
   else if (allLinesVisible) loadTubeAndRail();
 });
 
+document.getElementById('directionBtn').addEventListener('click', switchDirection);
+
 document.getElementById('refreshBtn').addEventListener('click', () => {
   loadBus();
   loadTubeAndRail();
@@ -914,6 +990,11 @@ async function requestWakeLock() {
 
 // ── Init ──
 initChart();
+// Set initial labels from config
+document.getElementById('pageTitle').textContent    = cfg().title;
+document.getElementById('pageSubtitle').textContent = cfg().subtitle;
+document.getElementById('busLabel').textContent     = cfg().busLabel;
+document.getElementById('railCardName').textContent = cfg().railName;
 loadBus();
 loadTubeAndRail();
 setInterval(loadBus, 15000);
