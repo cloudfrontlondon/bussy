@@ -117,6 +117,14 @@
   .marker.up    { background: #7f1d1d; color: #fca5a5; }
   .marker.down  { background: #14532d; color: #86efac; }
   .warning { color: #ff4444; font-size: 20px; margin-left: 6px; }
+  .bus-plate {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: #aaa;
+    letter-spacing: 2px;
+    margin-top: 2px;
+    min-height: 18px;
+  }
   .bus-footer { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
   /* ── Rail & Tube panels ── */
@@ -344,6 +352,7 @@
 <div id="busPanel">
   <div class="section-label">🚌 Bus 413 · Northbound to Morden</div>
   <div class="bus-display" id="busDisplay">–</div>
+  <div id="busPlate" class="bus-plate"></div>
   <div class="bus-secondary" id="busSecondary"></div>
   <div class="change-markers" id="changeMarkers"></div>
   <div class="bus-footer" id="busFooter"></div>
@@ -529,10 +538,15 @@ function renderBuses() {
 
   document.getElementById('busDisplay').textContent = next !== null ? formatTime(next) : '–';
 
+  // plate under the main timer
+  const plateEl = document.getElementById('busPlate');
+  if (plateEl) plateEl.textContent = currentBuses.length > 0 && currentBuses[0].vehicleId
+    ? currentBuses[0].vehicleId : '';
+
   // secondary chips
   const sec = document.getElementById('busSecondary');
   sec.innerHTML = currentBuses.slice(1).map(b =>
-    `<span class="bus-chip">${formatTime(b.timeToStation)}</span>`
+    `<span class="bus-chip">${formatTime(b.timeToStation)}${b.vehicleId ? ' · <span style="opacity:0.6;font-size:11px">' + b.vehicleId + '</span>' : ''}</span>`
   ).join('');
 
   // change markers
@@ -574,7 +588,7 @@ async function loadBus() {
       changeHistory = []; consecutiveNoDecrease = 0;
     }
     previousTimes = buses.map(b => b.timeToStation);
-    currentBuses  = buses.map(b => ({ timeToStation: b.timeToStation }));
+    currentBuses  = buses.map(b => ({ timeToStation: b.timeToStation, vehicleId: b.vehicleId }));
 
     renderBuses();
     updateChart(buses.length > 0 ? buses[0].timeToStation : null);
