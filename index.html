@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>413 – Morden Return</title>
+<title>413 – Parkway Transit</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -371,8 +371,8 @@
 
 <header>
   <div class="title-block">
-    <h1>Morden → Parkway</h1>
-    <div class="subtitle">413 · Return Journey</div>
+    <h1>Parkway → Morden</h1>
+    <div class="subtitle">413 · Live Departures</div>
   </div>
   <div class="header-btns">
     <button id="toggleLinesBtn" class="icon-btn" title="All tube lines">🗺️</button>
@@ -392,19 +392,13 @@
 
 <!-- Bus panel -->
 <div id="busPanel">
-  <div class="section-label">🚌 Bus 413 · Southbound to Raynes Park</div>
+  <div class="section-label">🚌 Bus 413 · Northbound to Morden</div>
   <div class="bus-display" id="busDisplay">–</div>
   <div id="busPlate" class="bus-plate"></div>
   <div class="bus-secondary" id="busSecondary"></div>
   <div class="change-markers" id="changeMarkers"></div>
   <div class="bus-footer" id="busFooter"></div>
   <div class="error-msg" id="busError"></div>
-</div>
-
-<!-- Other buses at Morden Civic Centre -->
-<div id="otherBusesPanel" style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;">
-  <div class="section-label">🚌 Other buses · Morden Civic Centre</div>
-  <div id="otherBusesList" style="font-size:13px;color:#ccc;margin-top:4px;">Loading…</div>
 </div>
 
 <div class="transit-grid">
@@ -428,10 +422,10 @@
   </a>
   <a class="transit-card" id="railCard"
      style="border-top-color: #e05206;"
-     href="https://www.journeycheck.com/swr/search?from=WAT&to=RAY"
+     href="https://www.nationalrail.co.uk/service-disruptions/"
      target="_blank" rel="noopener">
     <div class="tc-label">🚆 SW Rail</div>
-    <div class="tc-name">Waterloo → Raynes Park</div>
+    <div class="tc-name">Raynes Pk → Waterloo</div>
     <div class="tc-status" id="railStatus"><span class="dot dot-minor"></span>Checking…</div>
     <div class="tc-desc" id="railDesc"></div>
   </a>
@@ -457,11 +451,9 @@
 
 <script>
 // ── Constants ──
-// Morden Civic Centre Stop J — southbound 413 + other buses (163, 164, 293)
-const BUS_STOP = '490010018J';
+const BUS_STOP = '490010849N';
 const BUS_URL  = `https://api.tfl.gov.uk/StopPoint/${BUS_STOP}/Arrivals`;
-// Checkpoint: Morden Park Baptist Church southbound — suppress green until bus passes here
-const CHECKPOINT_STOP = '490009424S';
+const CHECKPOINT_STOP = '490009424N';
 const CHECKPOINT_URL  = `https://api.tfl.gov.uk/StopPoint/${CHECKPOINT_STOP}/Arrivals`;
 const TUBE_LINES_URL = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
 const SW_RAIL_TFL_URL = 'https://api.tfl.gov.uk/Line/south-western-railway/Status';
@@ -471,7 +463,7 @@ const SW_RAIL_TFL_URL = 'https://api.tfl.gov.uk/Line/south-western-railway/Statu
 const _urlParams = new URLSearchParams(window.location.search);
 const TAPI_ID  = _urlParams.get('tapp_id');
 const TAPI_KEY = _urlParams.get('tapp_key');
-const TAPI_URL = 'https://transportapi.com/v3/uk/train/station/WAT/live.json';
+const TAPI_URL = 'https://transportapi.com/v3/uk/train/station/RAY/live.json';
 
 // vehicleIds still expected at checkpoint (haven't passed it yet)
 let vehiclesStillBeforeCheckpoint = new Set();
@@ -486,7 +478,7 @@ function updateDelayBanner() {
   if (delayState.victoria !== null && delayState.victoria < 10)
     issues.push({ label: 'Victoria Line', url: 'https://tfl.gov.uk/tube/line/victoria/status' });
   if (delayState.rail !== null && delayState.rail < 10)
-    issues.push({ label: 'SW Rail', url: 'https://www.journeycheck.com/swr/search?from=WAT&to=RAY' });
+    issues.push({ label: 'SW Rail', url: 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT' });
 
   const banner = document.getElementById('delayBanner');
   const lines  = document.getElementById('bannerLines');
@@ -682,14 +674,6 @@ async function loadBus() {
       .sort((a,b) => a.timeToStation - b.timeToStation)
       .slice(0, 3);
 
-    // Other buses at same stop (not 413)
-    const otherBuses = data
-      .filter(b => b.lineName !== '413')
-      .sort((a,b) => a.timeToStation - b.timeToStation)
-      .slice(0, 6);
-
-    renderOtherBuses(otherBuses);
-
     if (buses.length > 0 && previousTimes.length > 0) {
       const delta = buses[0].timeToStation - previousTimes[0];
       const ch = getChangeMarker(delta);
@@ -729,32 +713,15 @@ async function loadBus() {
   }
 }
 
-// ── Other buses at stop ──
-function renderOtherBuses(buses) {
-  const el = document.getElementById('otherBusesList');
-  if (!el) return;
-  if (!buses.length) { el.textContent = 'No other buses right now'; return; }
-  el.innerHTML = buses.map(b => {
-    const mins = Math.floor(b.timeToStation / 60);
-    const secs = b.timeToStation % 60;
-    const time = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-    return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
-      <span><strong style="font-size:15px">${b.lineName}</strong> <span style="color:#888;font-size:12px">→ ${b.destinationName}</span></span>
-      <span style="font-family:'DM Mono',monospace;font-size:13px">${time}</span>
-    </div>`;
-  }).join('');
-}
-
 // ── Rail loaders ──
 async function loadRailFromTransportAPI() {
-  const url = `${TAPI_URL}?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=RAY&train_status=passenger&type=departure`;
+  const url = `${TAPI_URL}?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=WAT&train_status=passenger&type=departure`;
   const r = await fetch(url);
-  if (r.status === 429 || r.status === 403) throw new Error('429 quota exhausted');
   if (!r.ok) throw new Error('TransportAPI ' + r.status);
   const data = await r.json();
 
   const services = (data.departures?.all || []).filter(s =>
-    s.operator === 'SW' && (s.destination_name?.includes('Raynes') || s.calling_at_list?.includes('RAY'))
+    s.operator === 'SW' && s.destination_name?.includes('Waterloo')
   );
 
   if (!services.length) {
@@ -788,7 +755,7 @@ async function loadRailFromTransportAPI() {
   }
 
   renderLineStatus('railStatus', 'railDesc', severity, desc, 'railCard', 'rail');
-  document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=WAT&to=RAY';
+  document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
 }
 
 async function loadRailFromTfL() {
@@ -806,7 +773,7 @@ async function loadRailFromTfL() {
   const short = desc.length > 90 ? desc.slice(0,90) + '…' : desc;
 
   renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard', 'rail');
-  document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=WAT&to=RAY';
+  document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
 }
 
 
@@ -882,17 +849,9 @@ async function loadTubeAndRail() {
       await loadRailFromTfL();
     }
   } catch(err) {
-    // Try TfL as fallback if TransportAPI failed (e.g. quota exhausted)
-    try {
-      await loadRailFromTfL();
-      document.getElementById('railDesc').textContent += ' (TransportAPI unavailable — using TfL)';
-    } catch(err2) {
-      document.getElementById('railStatus').innerHTML = `<span class="dot dot-minor"></span>Tap to check`;
-      document.getElementById('railDesc').textContent = err.message?.includes('429') || err.message?.includes('403')
-        ? '⚠️ Daily API quota reached — tap for live trains'
-        : 'Could not load rail data';
-      document.getElementById('railCard').href = 'https://www.nationalrail.co.uk/live-trains/departures/raynes-park/london-waterloo/';
-    }
+    document.getElementById('railStatus').innerHTML = `<span class="dot dot-minor"></span>Tap to check`;
+    document.getElementById('railDesc').textContent = 'Could not load';
+    document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
   }
 
   document.getElementById('railUpdated').textContent =
