@@ -30,7 +30,6 @@
     transition: background-color 0.8s ease;
   }
 
-  /* ── Header ── */
   header {
     display: flex;
     align-items: center;
@@ -65,7 +64,6 @@
   }
   .icon-btn:hover { background: rgba(255,255,255,0.12); }
 
-  /* ── Bus section ── */
   #busPanel {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -86,11 +84,7 @@
     line-height: 1;
     transition: color 0.5s;
   }
-  .bus-secondary {
-    display: flex;
-    gap: 10px;
-    margin-top: 8px;
-  }
+  .bus-secondary { display: flex; gap: 10px; margin-top: 8px; }
   .bus-chip {
     font-family: 'DM Mono', monospace;
     font-size: 13px;
@@ -99,12 +93,7 @@
     padding: 4px 8px;
     color: #ccc;
   }
-  .change-markers {
-    display: flex;
-    gap: 4px;
-    margin-top: 8px;
-    flex-wrap: wrap;
-  }
+  .change-markers { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
   .marker {
     width: 22px; height: 22px;
     line-height: 22px;
@@ -127,48 +116,19 @@
     background: #f5c400;
     border: 2px solid #111;
     border-radius: 4px;
-    padding: 3px 10px 3px 10px;
+    padding: 3px 10px;
     margin-top: 6px;
     min-height: 18px;
     text-transform: uppercase;
   }
   .bus-footer { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
-  /* ── Rail & Tube panels ── */
   .transit-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
     margin-bottom: 10px;
   }
-  .tube-pair {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 8px;
-  }
-  .tube-sub {
-    display: block;
-    text-decoration: none;
-    color: inherit;
-    padding: 8px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.04);
-    transition: background 0.2s;
-  }
-  .tube-sub:hover { background: rgba(255,255,255,0.09); }
-  .tube-sub.card-delay {
-    background: rgba(180,0,0,0.22);
-    animation: cardAlarm 2s ease-in-out infinite;
-  }
-  .tube-sub-name {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 16px;
-    padding-left: 6px;
-    margin-bottom: 4px;
-    letter-spacing: 0.5px;
-  }
-
   .transit-card {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -181,8 +141,6 @@
     border-top-width: 4px;
   }
   .transit-card:hover { background: rgba(255,255,255,0.07); }
-
-  /* delay state — red flash on the card */
   .transit-card.card-delay {
     background: rgba(180, 0, 0, 0.18);
     border-color: #c00;
@@ -192,7 +150,6 @@
     0%, 100% { background: rgba(180,0,0,0.18); }
     50%       { background: rgba(220,0,0,0.32); }
   }
-
   .transit-card .tc-label {
     font-size: 10px;
     letter-spacing: 2.5px;
@@ -205,11 +162,7 @@
     font-size: 20px;
     letter-spacing: 0.5px;
   }
-  .transit-card .tc-status {
-    font-size: 12px;
-    margin-top: 4px;
-    font-weight: 500;
-  }
+  .transit-card .tc-status { font-size: 12px; margin-top: 4px; font-weight: 500; }
   .transit-card .tc-desc {
     font-size: 11px;
     color: var(--muted);
@@ -228,7 +181,6 @@
   .dot-minor { background: var(--rail-minor); box-shadow: 0 0 6px var(--rail-minor); }
   .dot-major { background: var(--rail-major); box-shadow: 0 0 6px var(--rail-major); }
 
-  /* ── All Lines Panel ── */
   #allLinesPanel {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -252,15 +204,9 @@
     border-radius: 8px;
     background: rgba(255,255,255,0.03);
   }
-  .line-pill {
-    width: 10px; height: 10px;
-    border-radius: 3px;
-    flex-shrink: 0;
-  }
+  .line-pill { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
   .line-name { font-size: 12px; font-weight: 500; flex: 1; }
-  .line-status-dot { font-size: 10px; }
 
-  /* ── Rail last updated ── */
   .last-updated {
     font-size: 11px;
     color: var(--muted);
@@ -269,7 +215,6 @@
     font-family: 'DM Mono', monospace;
   }
 
-  /* ── Graph ── */
   #graphContainer {
     position: fixed;
     bottom: 16px;
@@ -281,11 +226,8 @@
     padding: 10px;
     transition: opacity 0.3s, height 0.3s, padding 0.3s;
   }
-  #graphContainer.hidden {
-    opacity: 0; height: 0; padding: 0; pointer-events: none;
-  }
+  #graphContainer.hidden { opacity: 0; height: 0; padding: 0; pointer-events: none; }
 
-  /* ── Progress bar ── */
   .progress-container {
     position: fixed;
     bottom: 0; left: 0; right: 0;
@@ -305,7 +247,6 @@
     to   { transform: scaleX(0); }
   }
 
-  /* ── Background tints — vivid, readable from across the room ── */
   body { transition: background-color 0.4s ease; }
   body.bg-red    { background-color: #8b0000; animation: none; }
   body.bg-amber  { background-color: #b85000; animation: none; }
@@ -341,6 +282,18 @@
   #delayBanner .banner-row { display: flex; align-items: baseline; gap: 8px; }
   #delayBanner .banner-icon { font-size: 16px; }
   #delayBanner .banner-lines { flex: 1; }
+  /* individual clickable service chips inside the banner */
+  #delayBanner .banner-chip {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 2px 6px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: rgba(255,255,255,0.4);
+  }
+  #delayBanner .banner-chip:hover { background: rgba(255,255,255,0.28); }
   #delayBanner .banner-tap { font-size: 10px; opacity: 0.7; margin-top: 3px; }
   @keyframes bannerPulse {
     0%, 100% { background: #b00000; }
@@ -349,21 +302,8 @@
 
   .error-msg { color: #ff6666; font-size: 12px; margin-top: 4px; }
 
-  /* Tube line colours */
-  .tube-bakerloo    { background: #894E24; }
-  .tube-central     { background: #E32017; }
-  .tube-circle      { background: #FFD300; }
-  .tube-district    { background: #00782A; }
-  .tube-hammersmith { background: #F3A9BB; }
-  .tube-jubilee     { background: #A0A5A9; }
-  .tube-metropolitan{ background: #9B0056; }
-  .tube-northern    { background: #000000; border: 1px solid #555; }
-  .tube-piccadilly  { background: #003688; }
-  .tube-victoria    { background: #0098D4; }
-  .tube-waterloo    { background: #95CDBA; }
-  .tube-elizabeth   { background: #6950A1; }
-  .tube-overground  { background: #EE7C0E; }
-  .tube-dlr         { background: #00A4A7; }
+  .tube-northern { background: #000000; border: 1px solid #555; }
+  .tube-victoria { background: #0098D4; }
 </style>
 </head>
 
@@ -375,20 +315,20 @@
     <div class="subtitle" id="pageSubtitle">413 · Outbound</div>
   </div>
   <div class="header-btns">
-    <button id="directionBtn" class="icon-btn" title="Reverse journey" style="font-size:20px">🔄</button>
+    <button id="directionBtn" class="icon-btn" title="Switch to Return" style="font-size:20px">⇄</button>
     <button id="toggleLinesBtn" class="icon-btn" title="All tube lines">🗺️</button>
     <button id="toggleGraphBtn" class="icon-btn" title="Toggle graph">📊</button>
     <button id="refreshBtn" class="icon-btn" title="Refresh">↺</button>
   </div>
 </header>
 
-<!-- Delay banner -->
+<!-- Delay banner — each chip links to its own service -->
 <div id="delayBanner">
   <div class="banner-row">
     <span class="banner-icon">⚠️</span>
     <div class="banner-lines" id="bannerLines"></div>
   </div>
-  <div class="banner-tap">Tap for details</div>
+  <div class="banner-tap">Tap a service for details</div>
 </div>
 
 <!-- Bus panel -->
@@ -441,13 +381,11 @@
   </div>
 </div>
 
-<!-- All lines toggle panel -->
 <div id="allLinesPanel">
   <div class="section-label">All TfL Lines</div>
   <div class="lines-grid" id="linesGrid">Loading…</div>
 </div>
 
-<!-- Graph -->
 <div id="graphContainer">
   <canvas id="etaChart"></canvas>
 </div>
@@ -470,6 +408,11 @@ const DIRECTIONS = {
     railName:       'Raynes Pk → Waterloo',
     journeyCheck:   'https://www.journeycheck.com/swr/search?from=RAY&to=WAT',
     showOtherBuses: false,
+    // Northern Line: outbound = southbound towards Morden, so alerts relevant if disruption
+    // mentions southbound, morden branch, or no specific direction
+    northernDirection: 'southbound',
+    // Victoria Line: outbound = southbound (towards Brixton) to get to Waterloo
+    victoriaDirection: 'southbound',
   },
   return: {
     title:          'London → Elm Walk',
@@ -482,6 +425,10 @@ const DIRECTIONS = {
     railName:       'Waterloo → Raynes Pk',
     journeyCheck:   'https://www.journeycheck.com/swr/search?from=WAT&to=RAY',
     showOtherBuses: true,
+    // Northern Line: return = northbound from Morden to Waterloo
+    northernDirection: 'northbound',
+    // Victoria Line: return = northbound (Victoria → Warren St → Euston) to get to Waterloo
+    victoriaDirection: 'northbound',
   }
 };
 let currentDirection = 'outbound';
@@ -495,37 +442,54 @@ const _urlParams = new URLSearchParams(window.location.search);
 const TAPI_ID  = _urlParams.get('tapp_id');
 const TAPI_KEY = _urlParams.get('tapp_key');
 
-// vehicleIds still expected at checkpoint (haven't passed it yet)
 let vehiclesStillBeforeCheckpoint = new Set();
 
-// Delay state per service
+// delayState stores { severity, url } per service
 const delayState = { northern: null, victoria: null, rail: null };
 
+// ── Direction-aware disruption filtering ──
+// Returns true if a disruption description is relevant to the given direction of travel.
+// Strategy: if the text mentions the *opposite* direction only, suppress it.
+// If it mentions our direction, or no direction at all, show it.
+function isDisruptionRelevant(desc, myDirection) {
+  if (!desc) return false;
+  const d = desc.toLowerCase();
+  const opposite = myDirection === 'northbound' ? 'southbound' : 'northbound';
+  const mentionsOpposite = d.includes(opposite);
+  const mentionsMine     = d.includes(myDirection);
+  // If only the opposite direction is mentioned, suppress
+  if (mentionsOpposite && !mentionsMine) return false;
+  return true;
+}
+
+// ── Delay banner — now each chip is independently clickable ──
 function updateDelayBanner() {
   const issues = [];
-  if (delayState.northern !== null && delayState.northern < 10)
-    issues.push({ label: 'Northern Line', url: 'https://tfl.gov.uk/tube/line/northern/status' });
-  if (delayState.victoria !== null && delayState.victoria < 10)
-    issues.push({ label: 'Victoria Line', url: 'https://tfl.gov.uk/tube/line/victoria/status' });
-  if (delayState.rail !== null && delayState.rail < 10)
-    issues.push({ label: 'SW Rail', url: 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT' });
+  if (delayState.northern && delayState.northern.severity < 10)
+    issues.push({ label: 'Northern Line', url: delayState.northern.url });
+  if (delayState.victoria && delayState.victoria.severity < 10)
+    issues.push({ label: 'Victoria Line', url: delayState.victoria.url });
+  if (delayState.rail && delayState.rail.severity < 10)
+    issues.push({ label: 'SW Rail', url: delayState.rail.url });
 
   const banner = document.getElementById('delayBanner');
   const lines  = document.getElementById('bannerLines');
 
   if (issues.length === 0) {
     banner.classList.remove('visible');
-    banner.onclick = null;
     return;
   }
 
-  lines.innerHTML = issues.map(i => `<span style="margin-right:10px">🔴 ${i.label}</span>`).join('');
+  // Each chip opens its own URL
+  lines.innerHTML = issues.map(i =>
+    `<span class="banner-chip" onclick="event.stopPropagation();window.open('${i.url}','_blank')">🔴 ${i.label}</span>`
+  ).join('');
   banner.classList.add('visible');
-  // tap opens first affected service
+  // Tapping the banner itself (not a chip) opens the first issue
   banner.onclick = () => window.open(issues[0].url, '_blank');
 }
 
-// Tube line colours for pill
+// Tube line colours for all-lines panel
 const TUBE_COLOURS = {
   'bakerloo':           '#894E24',
   'central':            '#E32017',
@@ -582,13 +546,9 @@ function initChart() {
 
 function updateChart(seconds) {
   if (seconds === null) return;
-  const now = new Date();
-  etaHistory.push({ t: now, s: seconds });
+  etaHistory.push({ t: new Date(), s: seconds });
   if (etaHistory.length > MAX_POINTS) etaHistory.shift();
-  etaChart.data.labels = etaHistory.map(h => {
-    const m = Math.floor(h.s / 60);
-    return m + 'm';
-  });
+  etaChart.data.labels = etaHistory.map(h => Math.floor(h.s / 60) + 'm');
   etaChart.data.datasets[0].data = etaHistory.map(h => h.s);
   etaChart.update();
 }
@@ -609,14 +569,11 @@ function getChangeMarker(delta) {
 function updateBackground(nextSeconds, vehicleId) {
   document.body.classList.remove("bg-red","bg-amber","bg-green","bg-yellow");
   const beforeCheckpoint = vehicleId && vehiclesStillBeforeCheckpoint.has(vehicleId);
-
   if (nextSeconds == null || nextSeconds > 360) {
     document.body.classList.add("bg-red");
   } else if (nextSeconds < 120) {
-    // imminent — yellow regardless (it's definitely past checkpoint by now)
     document.body.classList.add("bg-yellow");
   } else if (beforeCheckpoint) {
-    // in time window but not past checkpoint yet — hold at amber
     document.body.classList.add("bg-amber");
   } else if (nextSeconds >= 270) {
     document.body.classList.add("bg-amber");
@@ -626,7 +583,6 @@ function updateBackground(nextSeconds, vehicleId) {
 }
 
 function statusClass(severityCode) {
-  // TfL severity: 10 = Good, 0/1/2 = Suspended, others = disruption
   if (severityCode === 10) return 'dot-good';
   if (severityCode <= 3)   return 'dot-major';
   return 'dot-minor';
@@ -637,7 +593,7 @@ function statusText(severity) {
   return 'Minor delays';
 }
 
-// ── Bus Load ──
+// ── Bus ──
 function resetProgressBar() {
   const bar = document.getElementById("progressBar");
   bar.style.animation = 'none';
@@ -658,28 +614,23 @@ function startCountdown() {
 
 function renderBuses() {
   const next = currentBuses.length > 0 ? currentBuses[0].timeToStation : null;
-
   document.getElementById('busDisplay').textContent = next !== null ? formatTime(next) : '–';
 
-  // plate under the main timer
   const plateEl = document.getElementById('busPlate');
   if (plateEl) plateEl.textContent = currentBuses.length > 0 && currentBuses[0].vehicleId
     ? currentBuses[0].vehicleId : '';
 
-  // secondary chips
   const sec = document.getElementById('busSecondary');
   sec.innerHTML = currentBuses.slice(1).map(b =>
     `<span class="bus-chip">${formatTime(b.timeToStation)}${b.vehicleId ? ' · <span style="opacity:0.6;font-size:11px">' + b.vehicleId + '</span>' : ''}</span>`
   ).join('');
 
-  // change markers
   const cm = document.getElementById('changeMarkers');
   cm.innerHTML = changeHistory.slice(-10).map(ch =>
     `<span class="marker ${ch.cls}">${ch.symbol}</span>`
   ).join('');
   if (consecutiveNoDecrease >= 8) cm.innerHTML += '<span class="warning">⚠️</span>';
 
-  // footer
   const nearestVehicle = currentBuses.length > 0 ? currentBuses[0].vehicleId : null;
   const beforeCheckpoint = nearestVehicle && vehiclesStillBeforeCheckpoint.has(nearestVehicle);
   document.getElementById('busFooter').textContent =
@@ -688,7 +639,7 @@ function renderBuses() {
     currentBuses.length === 1 ? '✓ Past checkpoint' :
     `✓ Past checkpoint · +${currentBuses.length - 1} following`;
 
-  updateBackground(next, currentBuses.length > 0 ? currentBuses[0].vehicleId : null);
+  updateBackground(next, nearestVehicle);
 }
 
 async function loadBus() {
@@ -704,7 +655,6 @@ async function loadBus() {
       .sort((a,b) => a.timeToStation - b.timeToStation)
       .slice(0, 3);
 
-    // Other buses (return mode only)
     if (cfg().showOtherBuses) {
       const others = data
         .filter(b => b.lineName !== '413')
@@ -730,7 +680,6 @@ async function loadBus() {
     updateChart(buses.length > 0 ? buses[0].timeToStation : null);
     startCountdown();
 
-    // Check checkpoint: which vehicles are still upstream?
     try {
       const rc = await fetch(`https://api.tfl.gov.uk/StopPoint/${cfg().checkpoint}/Arrivals`);
       if (rc.ok) {
@@ -742,14 +691,12 @@ async function loadBus() {
     } catch(e) {
       vehiclesStillBeforeCheckpoint = new Set();
     }
-    // re-render now we know checkpoint state
     renderBuses();
   } catch(err) {
     document.getElementById('busError').textContent = `Bus error: ${err.message}`;
   }
 }
 
-// ── Rail loaders ──
 function renderOtherBuses(buses) {
   const el = document.getElementById('otherBusesList');
   if (!el) return;
@@ -765,10 +712,10 @@ function renderOtherBuses(buses) {
   }).join('');
 }
 
+// ── Rail loaders ──
 async function loadRailFromTransportAPI() {
   const { railFrom, railTo, journeyCheck } = cfg();
-  const station = railFrom;
-  const url = `https://transportapi.com/v3/uk/train/station/${station}/live.json?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=${railTo}&train_status=passenger&type=departure`;
+  const url = `https://transportapi.com/v3/uk/train/station/${railFrom}/live.json?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=${railTo}&train_status=passenger&type=departure`;
   const r = await fetch(url);
   if (r.status === 429 || r.status === 403) throw new Error('429 quota exhausted');
   if (!r.ok) throw new Error('TransportAPI ' + r.status);
@@ -777,13 +724,13 @@ async function loadRailFromTransportAPI() {
   const services = (data.departures?.all || []).filter(s => s.operator === 'SW');
 
   if (!services.length) {
-    renderLineStatus('railStatus', 'railDesc', 10, 'No upcoming SWR departures', 'railCard', 'rail');
+    renderLineStatus('railStatus', 'railDesc', 10, 'No upcoming SWR departures', 'railCard', 'rail', journeyCheck);
     return;
   }
 
   const next = services[0];
-  const status = next.status;
-  const aimed  = next.aimed_departure_time;
+  const status   = next.status;
+  const aimed    = next.aimed_departure_time;
   const expected = next.expected_departure_time;
   const minsAway = next.best_departure_estimate_mins;
 
@@ -804,8 +751,7 @@ async function loadRailFromTransportAPI() {
     desc = `${aimed} dep — on time · ${minsAway != null ? minsAway + ' min away' : ''}`;
   }
 
-  renderLineStatus('railStatus', 'railDesc', severity, desc, 'railCard', 'rail');
-  document.getElementById('railCard').href = journeyCheck;
+  renderLineStatus('railStatus', 'railDesc', severity, desc, 'railCard', 'rail', journeyCheck);
 }
 
 async function loadRailFromTfL() {
@@ -820,67 +766,77 @@ async function loadRailFromTfL() {
   const severity = isGood ? 10 : Math.min(rawSeverity, 5);
   const desc = s?.disruption?.description || s?.statusSeverityDescription || '';
   const short = desc.length > 90 ? desc.slice(0,90) + '…' : desc;
-  renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard', 'rail');
-  document.getElementById('railCard').href = cfg().journeyCheck;
+  renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard', 'rail', cfg().journeyCheck);
 }
 
-
-
-function renderLineStatus(statusId, descId, severity, desc, cardId, serviceKey) {
-  const el = document.getElementById(statusId);
-  const dc = document.getElementById(descId);
+// ── Core render function — now takes a url param for the delay banner ──
+// serviceKey: 'northern' | 'victoria' | 'rail' | null
+function renderLineStatus(statusId, descId, severity, desc, cardId, serviceKey, serviceUrl) {
+  const el   = document.getElementById(statusId);
+  const dc   = document.getElementById(descId);
   const card = cardId ? document.getElementById(cardId) : null;
   if (!el) return;
-  const cls = statusClass(severity);
-  const txt = statusText(severity);
-  el.innerHTML = `<span class="dot ${cls}"></span>${txt}`;
+
+  el.innerHTML = `<span class="dot ${statusClass(severity)}"></span>${statusText(severity)}`;
   if (dc) dc.textContent = desc || '';
   if (card) card.classList.toggle('card-delay', severity < 10);
-  // track for banner
+
+  // Track for banner — store severity + the correct link for this direction
   if (serviceKey) {
-    delayState[serviceKey] = severity;
+    delayState[serviceKey] = { severity, url: serviceUrl || cfg().journeyCheck };
     updateDelayBanner();
   }
 }
 
 async function loadTubeAndRail() {
   try {
-    // Tube lines
     const r = await fetch(TUBE_LINES_URL);
     if (!r.ok) throw new Error('Tube API ' + r.status);
     const lines = await r.json();
 
-    // Northern
+    // ── Northern Line ──
     const northern = lines.find(l => l.id === 'northern');
     if (northern && northern.lineStatuses?.length) {
       const s = northern.lineStatuses[0];
-      const disruptionDesc = s.disruption?.description || '';
-      // shorten desc for card
-      const short = disruptionDesc.length > 80 ? disruptionDesc.slice(0,80) + '…' : disruptionDesc;
-      renderLineStatus('northernStatus', 'northernDesc', s.statusSeverity, short, 'northernCard', 'northern');
-      // update link if disruption
-      if (s.statusSeverity < 10) {
-        document.getElementById('northernCard').href =
-          'https://tfl.gov.uk/tube/line/northern/status';
-      }
+      const fullDesc = s.disruption?.description || '';
+      const myDir    = cfg().northernDirection;
+      const relevant = s.statusSeverity === 10 || isDisruptionRelevant(fullDesc, myDir);
+      const severity = relevant ? s.statusSeverity : 10; // suppress if opposite direction only
+      const short    = fullDesc.length > 80 ? fullDesc.slice(0,80) + '…' : fullDesc;
+      // Append direction tag if we're suppressing or showing a directional disruption
+      const displayDesc = !relevant ? `(${myDir === 'northbound' ? 'Southbound' : 'Northbound'} only — not your direction)` : short;
+
+      renderLineStatus(
+        'northernStatus', 'northernDesc',
+        severity, displayDesc,
+        'northernCard', 'northern',
+        'https://tfl.gov.uk/tube/line/northern/status'
+      );
+      document.getElementById('northernCard').href = 'https://tfl.gov.uk/tube/line/northern/status';
     }
 
-    // Victoria
+    // ── Victoria Line ──
     const victoria = lines.find(l => l.id === 'victoria');
     if (victoria && victoria.lineStatuses?.length) {
       const s = victoria.lineStatuses[0];
-      const disruptionDesc = s.disruption?.description || '';
-      const short = disruptionDesc.length > 80 ? disruptionDesc.slice(0,80) + '…' : disruptionDesc;
-      renderLineStatus('victoriaStatus', 'victoriaDesc', s.statusSeverity, short, 'victoriaCard', 'victoria');
-      if (s.statusSeverity < 10) {
-        document.getElementById('victoriaCard').href =
-          'https://tfl.gov.uk/tube/line/victoria/status';
-      }
+      const fullDesc = s.disruption?.description || '';
+      const myDir    = cfg().victoriaDirection;
+      const relevant = s.statusSeverity === 10 || isDisruptionRelevant(fullDesc, myDir);
+      const severity = relevant ? s.statusSeverity : 10;
+      const short    = fullDesc.length > 80 ? fullDesc.slice(0,80) + '…' : fullDesc;
+      const displayDesc = !relevant ? `(${myDir === 'northbound' ? 'Southbound' : 'Northbound'} only — not your direction)` : short;
+
+      renderLineStatus(
+        'victoriaStatus', 'victoriaDesc',
+        severity, displayDesc,
+        'victoriaCard', 'victoria',
+        'https://tfl.gov.uk/tube/line/victoria/status'
+      );
+      document.getElementById('victoriaCard').href = 'https://tfl.gov.uk/tube/line/victoria/status';
     }
 
-    // All lines panel
     if (allLinesVisible) renderAllLines(lines);
-    window._allTubeLines = lines; // cache
+    window._allTubeLines = lines;
 
   } catch(err) {
     ['northernStatus','victoriaStatus'].forEach(id => {
@@ -889,7 +845,7 @@ async function loadTubeAndRail() {
     });
   }
 
-  // SW Rail — use TransportAPI if creds available (30 req/day free), else TfL fallback
+  // ── SW Rail ──
   try {
     if (TAPI_ID && TAPI_KEY) {
       await loadRailFromTransportAPI();
@@ -897,7 +853,6 @@ async function loadTubeAndRail() {
       await loadRailFromTfL();
     }
   } catch(err) {
-    // Try TfL as fallback if TransportAPI failed (e.g. quota exhausted)
     try {
       await loadRailFromTfL();
       document.getElementById('railDesc').textContent += ' (TransportAPI unavailable — using TfL)';
@@ -906,7 +861,10 @@ async function loadTubeAndRail() {
       document.getElementById('railDesc').textContent = err.message?.includes('429') || err.message?.includes('403')
         ? '⚠️ Daily API quota reached — tap for live trains'
         : 'Could not load rail data';
-      document.getElementById('railCard').href = 'https://www.nationalrail.co.uk/live-trains/departures/raynes-park/london-waterloo/';
+      // Always use direction-correct journeycheck link
+      document.getElementById('railCard').href = cfg().journeyCheck;
+      // Update banner with correct URL even in error state
+      if (delayState.rail) delayState.rail.url = cfg().journeyCheck;
     }
   }
 
@@ -918,15 +876,13 @@ async function loadTubeAndRail() {
 function renderAllLines(lines) {
   const grid = document.getElementById('linesGrid');
   if (!lines || !lines.length) { grid.textContent = 'No data'; return; }
-
   grid.innerHTML = lines.map(line => {
     const colour = TUBE_COLOURS[line.id] || '#888';
-    const sev = line.lineStatuses?.[0]?.statusSeverity ?? 10;
-    const dotCls = statusClass(sev);
+    const sev    = line.lineStatuses?.[0]?.statusSeverity ?? 10;
     return `<div class="line-row">
       <div class="line-pill" style="background:${colour};border:1px solid rgba(255,255,255,0.15)"></div>
       <div class="line-name">${line.name}</div>
-      <span class="dot ${dotCls}" style="margin:0"></span>
+      <span class="dot ${statusClass(sev)}" style="margin:0"></span>
     </div>`;
   }).join('');
 }
@@ -936,24 +892,32 @@ function switchDirection() {
   currentDirection = currentDirection === 'outbound' ? 'return' : 'outbound';
   const c = cfg();
 
-  // Update UI labels
-  document.getElementById('pageTitle').textContent   = c.title;
+  document.getElementById('pageTitle').textContent    = c.title;
   document.getElementById('pageSubtitle').textContent = c.subtitle;
   document.getElementById('busLabel').textContent     = c.busLabel;
   document.getElementById('railCardName').textContent = c.railName;
-  document.getElementById('directionBtn').title = currentDirection === 'outbound'
-    ? 'Switch to Return' : 'Switch to Outbound';
+  document.getElementById('directionBtn').title =
+    currentDirection === 'outbound' ? 'Switch to Return' : 'Switch to Outbound';
 
-  // Reset bus state
+  // Reset bus & delay state
   currentBuses = []; previousTimes = []; changeHistory = []; consecutiveNoDecrease = 0;
   vehiclesStillBeforeCheckpoint = new Set();
-  delayState.rail = null;
+  delayState.rail = null; delayState.northern = null; delayState.victoria = null;
+  updateDelayBanner();
 
-  // Reset rail card status
-  document.getElementById('railStatus').innerHTML = '<span class="dot dot-minor"></span>Checking…';
-  document.getElementById('railDesc').textContent = '';
+  // Reset statuses
+  ['railStatus','northernStatus','victoriaStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<span class="dot dot-minor"></span>Checking…';
+  });
+  ['railDesc','northernDesc','victoriaDesc'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '';
+  });
 
-  // Reload everything
+  // Update rail card link immediately
+  document.getElementById('railCard').href = c.journeyCheck;
+
   loadBus();
   loadTubeAndRail();
 }
@@ -967,8 +931,7 @@ document.getElementById('toggleGraphBtn').addEventListener('click', () => {
 
 document.getElementById('toggleLinesBtn').addEventListener('click', () => {
   allLinesVisible = !allLinesVisible;
-  const panel = document.getElementById('allLinesPanel');
-  panel.classList.toggle('visible', allLinesVisible);
+  document.getElementById('allLinesPanel').classList.toggle('visible', allLinesVisible);
   document.getElementById('toggleLinesBtn').textContent = allLinesVisible ? '🗺' : '🗺️';
   if (allLinesVisible && window._allTubeLines) renderAllLines(window._allTubeLines);
   else if (allLinesVisible) loadTubeAndRail();
@@ -983,14 +946,11 @@ document.getElementById('refreshBtn').addEventListener('click', () => {
 
 // ── Wake Lock ──
 async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
-  } catch(e) {}
+  try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch(e) {}
 }
 
 // ── Init ──
 initChart();
-// Set initial labels from config
 document.getElementById('pageTitle').textContent    = cfg().title;
 document.getElementById('pageSubtitle').textContent = cfg().subtitle;
 document.getElementById('busLabel').textContent     = cfg().busLabel;
@@ -998,8 +958,7 @@ document.getElementById('railCardName').textContent = cfg().railName;
 loadBus();
 loadTubeAndRail();
 setInterval(loadBus, 15000);
-setInterval(loadTubeAndRail, 60000); // tube every 60s (TfL, no quota)
-// Rail via TransportAPI = 30 req/day free — 5 min refresh = ~8 req per 40min session
+setInterval(loadTubeAndRail, 60000);
 setInterval(() => {
   if (TAPI_ID && TAPI_KEY) loadRailFromTransportAPI().catch(() => {});
   else loadRailFromTfL().catch(() => {});
