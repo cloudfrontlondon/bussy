@@ -126,6 +126,33 @@
     gap: 10px;
     margin-bottom: 10px;
   }
+  .tube-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .tube-sub {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    transition: background 0.2s;
+  }
+  .tube-sub:hover { background: rgba(255,255,255,0.09); }
+  .tube-sub.card-delay {
+    background: rgba(180,0,0,0.22);
+    animation: cardAlarm 2s ease-in-out infinite;
+  }
+  .tube-sub-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    padding-left: 6px;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
 
   .transit-card {
     background: var(--panel);
@@ -263,16 +290,20 @@
     to   { transform: scaleX(0); }
   }
 
-  /* ── Background tints — vivid enough to read from across the room ── */
-  body { transition: background-color 0.6s ease; }
-  body.bg-red    { background-color: #5c0000; }
-  body.bg-amber  { background-color: #6b3800; }
-  body.bg-green  { background-color: #004d1a; }
-  body.bg-yellow { background-color: #5c4a00; animation: urgentPulse 1.2s ease-in-out infinite; }
+  /* ── Background tints — vivid, readable from across the room ── */
+  body { transition: background-color 0.4s ease; }
+  body.bg-red    { background-color: #8b0000; animation: none; }
+  body.bg-amber  { background-color: #b85000; animation: none; }
+  body.bg-green  { background-color: #007a2a; animation: greenPulse 2s ease-in-out infinite; }
+  body.bg-yellow { animation: yellowPulse 0.9s ease-in-out infinite; }
 
-  @keyframes urgentPulse {
-    0%, 100% { background-color: #5c4a00; }
-    50%       { background-color: #a07e00; }
+  @keyframes greenPulse {
+    0%, 100% { background-color: #007a2a; }
+    50%       { background-color: #00c44a; }
+  }
+  @keyframes yellowPulse {
+    0%, 100% { background-color: #c8960a; }
+    50%       { background-color: #ffe033; }
   }
 
   .error-msg { color: #ff6666; font-size: 12px; margin-top: 4px; }
@@ -319,17 +350,8 @@
   <div class="error-msg" id="busError"></div>
 </div>
 
-<!-- Rail + Tube cards -->
+<!-- Tube + Rail cards -->
 <div class="transit-grid">
-  <a class="transit-card" id="railCard"
-     style="border-top-color: #e05206;"
-     href="https://www.nationalrail.co.uk/service-disruptions/"
-     target="_blank" rel="noopener">
-    <div class="tc-label">🚆 SW Rail</div>
-    <div class="tc-name">Raynes Pk → Waterloo</div>
-    <div class="tc-status" id="railStatus"><span class="dot dot-minor"></span>Checking…</div>
-    <div class="tc-desc" id="railDesc"></div>
-  </a>
   <a class="transit-card" id="northernCard"
      style="border-top-color: #888;"
      href="https://tfl.gov.uk/tube/stop/940GZZLUMDN/morden-underground-station"
@@ -348,7 +370,15 @@
     <div class="tc-status" id="victoriaStatus"><span class="dot dot-minor"></span>Checking…</div>
     <div class="tc-desc" id="victoriaDesc"></div>
   </a>
-  <!-- Placeholder for last updated -->
+  <a class="transit-card" id="railCard"
+     style="border-top-color: #e05206;"
+     href="https://www.nationalrail.co.uk/service-disruptions/"
+     target="_blank" rel="noopener">
+    <div class="tc-label">🚆 SW Rail</div>
+    <div class="tc-name">Raynes Pk → Waterloo</div>
+    <div class="tc-status" id="railStatus"><span class="dot dot-minor"></span>Checking…</div>
+    <div class="tc-desc" id="railDesc"></div>
+  </a>
   <div style="display:flex;align-items:flex-end;">
     <div class="last-updated" id="railUpdated">Rail/Tube: never updated</div>
   </div>
@@ -564,7 +594,7 @@ function renderLineStatus(statusId, descId, severity, desc, cardId) {
   const txt = statusText(severity);
   el.innerHTML = `<span class="dot ${cls}"></span>${txt}`;
   if (dc) dc.textContent = desc || '';
-  // flash card red if any disruption
+  // flash card/sub red if any disruption
   if (card) card.classList.toggle('card-delay', severity < 10);
 }
 
