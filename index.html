@@ -717,6 +717,7 @@ async function loadBus() {
 async function loadRailFromTransportAPI() {
   const url = `${TAPI_URL}?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=WAT&train_status=passenger&type=departure`;
   const r = await fetch(url);
+  if (r.status === 429 || r.status === 403) throw new Error('429 quota exhausted');
   if (!r.ok) throw new Error('TransportAPI ' + r.status);
   const data = await r.json();
 
@@ -849,9 +850,17 @@ async function loadTubeAndRail() {
       await loadRailFromTfL();
     }
   } catch(err) {
-    document.getElementById('railStatus').innerHTML = `<span class="dot dot-minor"></span>Tap to check`;
-    document.getElementById('railDesc').textContent = 'Could not load';
-    document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
+    // Try TfL as fallback if TransportAPI failed (e.g. quota exhausted)
+    try {
+      await loadRailFromTfL();
+      document.getElementById('railDesc').textContent += ' (TransportAPI unavailable — using TfL)';
+    } catch(err2) {
+      document.getElementById('railStatus').innerHTML = `<span class="dot dot-minor"></span>Tap to check`;
+      document.getElementById('railDesc').textContent = err.message?.includes('429') || err.message?.includes('403')
+        ? '⚠️ Daily API quota reached — tap for live trains'
+        : 'Could not load rail data';
+      document.getElementById('railCard').href = 'https://www.nationalrail.co.uk/live-trains/departures/raynes-park/london-waterloo/';
+    }
   }
 
   document.getElementById('railUpdated').textContent =
