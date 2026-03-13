@@ -2,181 +2,344 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>413 – Parkway</title>
+<title>413 – Parkway Transit</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body {
-  font-family: -apple-system, system-ui;
-  background: #000;
-  color: #fff;
-  text-align: center;
-  margin: 0;
-  padding: 20px;
-  padding-bottom: 200px;
-  transition: background-color 0.8s ease;
-  position: relative;
-  min-height: 100vh;
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-h1 {
-  font-size: 26px;
-  margin: 0;
-}
-.bus-line {
-  margin: 20px 0;
-}
-.bus {
-  font-size: 48px;
-  font-weight: bold;
-}
-.change-markers {
-  margin-top: 6px;
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  min-height: 28px;
-}
-.marker {
-  width: 28px;
-  height: 28px;
-  line-height: 28px;
-  font-size: 18px;
-  border-radius: 6px;
-  text-align: center;
-  font-weight: bold;
-}
-.marker.same   { background: #444; color: #aaa; }
-.marker.up     { background: #8B0000; color: #fff; }
-.marker.down   { background: #006400; color: #fff; }
-.warning {
-  font-size: 28px;
-  color: #ff4444;
-  margin-left: 12px;
-  align-self: center;
-}
-.small {
-  color: #aaa;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.location, .error-msg {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #ccc;
-}
-.error-msg { color: #ff6666; }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap');
 
-/* Transparent icon buttons */
-.icon-btn {
-  background: transparent;
-  border: none;
-  color: #fff;
-  font-size: 24px;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: 12px;
-  transition: background 0.2s;
-}
-.icon-btn:hover,
-.icon-btn:focus {
-  background: rgba(255,255,255,0.15);
-  outline: none;
-}
+  :root {
+    --rail-good: #22c55e;
+    --rail-minor: #f59e0b;
+    --rail-major: #ef4444;
+    --bg: #0a0a0f;
+    --panel: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.08);
+    --text: #f0f0f0;
+    --muted: #666;
+  }
 
-/* Colors */
-.bg-red    { background-color: #8B0000; }
-.bg-amber  { background-color: #FF8C00; }
-.bg-green  { background-color: #32CD32; }
-.bg-yellow { background-color: #FFD700; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Icons & progress */
-.icon { width: 40px; height: 40px; }
-.progress-container {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 8px;
-  background: rgba(255,255,255,0.15);
-  z-index: 10;
-}
-.progress-bar {
-  height: 100%;
-  width: 100%;
-  background: rgba(255,255,255,0.7);
-  transform-origin: left;
-  animation: countdown 15s linear forwards;
-}
-@keyframes countdown {
-  from { transform: scaleX(1); }
-  to   { transform: scaleX(0); }
-}
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 16px 16px 180px;
+    transition: background-color 0.8s ease;
+  }
 
-/* Graph */
-#graphContainer {
-  position: fixed;
-  bottom: 20px;
-  left: 10px;
-  right: 10px;
-  height: 160px;
-  background: rgba(0,0,0,0.6);
-  border-radius: 8px;
-  padding: 10px;
-  box-sizing: border-box;
-  transition: opacity 0.3s ease, height 0.3s ease, padding 0.3s ease;
-}
-#graphContainer.hidden {
-  opacity: 0;
-  height: 0;
-  padding: 0;
-  margin: 0;
-  pointer-events: none;
-}
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 10px;
+  }
+  .title-block h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .title-block .subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .header-btns { display: flex; gap: 6px; }
+  .icon-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: #fff;
+    font-size: 18px;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: background 0.2s;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.12); }
+
+  /* ── Bus section ── */
+  #busPanel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .bus-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 56px;
+    line-height: 1;
+    transition: color 0.5s;
+  }
+  .bus-secondary {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .bus-chip {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: #ccc;
+  }
+  .change-markers {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .marker {
+    width: 22px; height: 22px;
+    line-height: 22px;
+    font-size: 12px;
+    border-radius: 5px;
+    text-align: center;
+    font-weight: bold;
+  }
+  .marker.same  { background: #333; color: #888; }
+  .marker.up    { background: #7f1d1d; color: #fca5a5; }
+  .marker.down  { background: #14532d; color: #86efac; }
+  .warning { color: #ff4444; font-size: 20px; margin-left: 6px; }
+  .bus-footer { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  /* ── Rail & Tube panels ── */
+  .transit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .transit-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+    text-decoration: none;
+    display: block;
+  }
+  .transit-card:hover { background: rgba(255,255,255,0.07); }
+
+  .transit-card .tc-label {
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .transit-card .tc-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.5px;
+  }
+  .transit-card .tc-status {
+    font-size: 12px;
+    margin-top: 4px;
+    font-weight: 500;
+  }
+  .transit-card .tc-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+    line-height: 1.3;
+  }
+
+  .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+  .dot-good  { background: var(--rail-good); box-shadow: 0 0 6px var(--rail-good); }
+  .dot-minor { background: var(--rail-minor); box-shadow: 0 0 6px var(--rail-minor); }
+  .dot-major { background: var(--rail-major); box-shadow: 0 0 6px var(--rail-major); }
+
+  /* ── All Lines Panel ── */
+  #allLinesPanel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 10px;
+    display: none;
+  }
+  #allLinesPanel.visible { display: block; }
+  .lines-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .line-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+  }
+  .line-pill {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .line-name { font-size: 12px; font-weight: 500; flex: 1; }
+  .line-status-dot { font-size: 10px; }
+
+  /* ── Rail last updated ── */
+  .last-updated {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+    margin-top: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── Graph ── */
+  #graphContainer {
+    position: fixed;
+    bottom: 16px;
+    left: 10px; right: 10px;
+    height: 150px;
+    background: rgba(10,10,15,0.92);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    transition: opacity 0.3s, height 0.3s, padding 0.3s;
+  }
+  #graphContainer.hidden {
+    opacity: 0; height: 0; padding: 0; pointer-events: none;
+  }
+
+  /* ── Progress bar ── */
+  .progress-container {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    z-index: 10;
+  }
+  .progress-bar {
+    height: 100%;
+    width: 100%;
+    background: rgba(255,255,255,0.5);
+    transform-origin: left;
+    animation: countdown 15s linear forwards;
+  }
+  @keyframes countdown {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+  }
+
+  /* ── Background tints ── */
+  body.bg-red    { background-color: #1a0505; }
+  body.bg-amber  { background-color: #1a0d00; }
+  body.bg-green  { background-color: #051a09; }
+  body.bg-yellow { background-color: #1a1500; }
+
+  .error-msg { color: #ff6666; font-size: 12px; margin-top: 4px; }
+
+  /* Tube line colours */
+  .tube-bakerloo    { background: #894E24; }
+  .tube-central     { background: #E32017; }
+  .tube-circle      { background: #FFD300; }
+  .tube-district    { background: #00782A; }
+  .tube-hammersmith { background: #F3A9BB; }
+  .tube-jubilee     { background: #A0A5A9; }
+  .tube-metropolitan{ background: #9B0056; }
+  .tube-northern    { background: #000000; border: 1px solid #555; }
+  .tube-piccadilly  { background: #003688; }
+  .tube-victoria    { background: #0098D4; }
+  .tube-waterloo    { background: #95CDBA; }
+  .tube-elizabeth   { background: #6950A1; }
+  .tube-overground  { background: #EE7C0E; }
+  .tube-dlr         { background: #00A4A7; }
 </style>
 </head>
 
 <body class="bg-red">
 
 <header>
-  <div class="header-left">
-    <svg class="icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="fill:#ff0000;">
-      <path d="M480 192H32c-17.7 0-32 14.3-32 32v96c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-96c0-17.7-14.3-32-32-32zM96 352c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm320 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zM480 96H32C14.3 96 0 110.3 0 128v32c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32z"/>
-      <rect x="64" y="64" width="384" height="128" fill="#ffffff"/>
-    </svg>
-    <h1>Parkway → Morden (413)</h1>
+  <div class="title-block">
+    <h1>Parkway → Morden</h1>
+    <div class="subtitle">413 · Live Departures</div>
   </div>
-
-  <div style="display: flex; gap: 8px;">
+  <div class="header-btns">
+    <button id="toggleLinesBtn" class="icon-btn" title="All tube lines">🗺️</button>
     <button id="toggleGraphBtn" class="icon-btn" title="Toggle graph">📊</button>
-    <button id="refreshBtn" class="icon-btn" title="Refresh now">🔄</button>
+    <button id="refreshBtn" class="icon-btn" title="Refresh">🔄</button>
   </div>
 </header>
 
-<div id="buses">Loading…</div>
-<div id="location" class="location">Stop location: Loading…</div>
-<div id="errorMsg" class="error-msg"></div>
+<!-- Bus panel -->
+<div id="busPanel">
+  <div class="section-label">🚌 Bus 413 · Northbound to Morden</div>
+  <div class="bus-display" id="busDisplay">–</div>
+  <div class="bus-secondary" id="busSecondary"></div>
+  <div class="change-markers" id="changeMarkers"></div>
+  <div class="bus-footer" id="busFooter"></div>
+  <div class="error-msg" id="busError"></div>
+</div>
 
+<!-- Rail + Tube cards -->
+<div class="transit-grid">
+  <a class="transit-card" id="railCard"
+     href="https://www.nationalrail.co.uk/service-disruptions/"
+     target="_blank" rel="noopener">
+    <div class="tc-label">🚆 SW Rail</div>
+    <div class="tc-name">Raynes Pk → Waterloo</div>
+    <div class="tc-status" id="railStatus"><span class="dot dot-minor"></span>Checking…</div>
+    <div class="tc-desc" id="railDesc"></div>
+  </a>
+  <a class="transit-card" id="northernCard"
+     href="https://tfl.gov.uk/tube/stop/940GZZLUMDN/morden-underground-station"
+     target="_blank" rel="noopener">
+    <div class="tc-label">🚇 Northern Line</div>
+    <div class="tc-name">Morden Branch</div>
+    <div class="tc-status" id="northernStatus"><span class="dot dot-minor"></span>Checking…</div>
+    <div class="tc-desc" id="northernDesc"></div>
+  </a>
+  <a class="transit-card" id="victoriaCard"
+     href="https://tfl.gov.uk/tube/line/victoria/status"
+     target="_blank" rel="noopener">
+    <div class="tc-label">🚇 Victoria Line</div>
+    <div class="tc-name">Victoria</div>
+    <div class="tc-status" id="victoriaStatus"><span class="dot dot-minor"></span>Checking…</div>
+    <div class="tc-desc" id="victoriaDesc"></div>
+  </a>
+  <!-- Placeholder for last updated -->
+  <div style="display:flex;align-items:flex-end;">
+    <div class="last-updated" id="railUpdated">Rail/Tube: never updated</div>
+  </div>
+</div>
+
+<!-- All lines toggle panel -->
+<div id="allLinesPanel">
+  <div class="section-label">All TfL Lines</div>
+  <div class="lines-grid" id="linesGrid">Loading…</div>
+</div>
+
+<!-- Graph -->
 <div id="graphContainer">
   <canvas id="etaChart"></canvas>
 </div>
@@ -186,8 +349,32 @@ h1 {
 </div>
 
 <script>
-let etaChart;
-const etaHistory = [];
+// ── Constants ──
+const BUS_STOP = '490010849N';
+const BUS_URL  = `https://api.tfl.gov.uk/StopPoint/${BUS_STOP}/Arrivals`;
+const TUBE_LINES_URL = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
+const SW_RAIL_URL = 'https://api.tfl.gov.uk/Line/Mode/national-rail/Status';
+
+// Tube line colours for pill
+const TUBE_COLOURS = {
+  'bakerloo':           '#894E24',
+  'central':            '#E32017',
+  'circle':             '#FFD300',
+  'district':           '#00782A',
+  'hammersmith-city':   '#F3A9BB',
+  'jubilee':            '#A0A5A9',
+  'metropolitan':       '#9B0056',
+  'northern':           '#333333',
+  'piccadilly':         '#003688',
+  'victoria':           '#0098D4',
+  'waterloo-city':      '#95CDBA',
+  'elizabeth':          '#6950A1',
+  'overground':         '#EE7C0E',
+  'dlr':                '#00A4A7',
+};
+
+// ── State ──
+let etaHistory = [], etaChart;
 const MAX_POINTS = 20;
 let countdownInterval = null;
 let currentBuses = [];
@@ -195,105 +382,81 @@ let previousTimes = [];
 let changeHistory = [];
 let consecutiveNoDecrease = 0;
 let graphVisible = true;
+let allLinesVisible = false;
 
+// ── Chart ──
 function initChart() {
   const ctx = document.getElementById('etaChart').getContext('2d');
   etaChart = new Chart(ctx, {
     type: 'line',
-    data: { labels: [], datasets: [{
-      label: 'Nearest bus ETA (seconds)',
-      data: [],
-      borderColor: '#4CAF50',
-      backgroundColor: 'rgba(76,175,80,0.2)',
-      tension: 0.3,
-      fill: true,
-      pointRadius: 4,
-    }]},
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Bus ETA (s)',
+        data: [],
+        borderColor: '#4ade80',
+        backgroundColor: 'rgba(74,222,128,0.15)',
+        tension: 0.4, fill: true, pointRadius: 3
+      }]
+    },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       scales: {
-        y: { beginAtZero: true, title: {display:true, text:'Seconds', color:'#fff'}, ticks:{color:'#aaa'} },
-        x: { title: {display:false}, ticks: {color:'#aaa', maxTicksLimit:8} }
+        y: { beginAtZero: true, ticks: { color: '#666' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        x: { ticks: { color: '#666', maxTicksLimit: 7 }, grid: { display: false } }
       },
-      plugins: { legend: {labels:{color:'#fff'}} }
+      plugins: { legend: { labels: { color: '#888', font: { size: 11 } } } }
     }
   });
 }
 
 function updateChart(seconds) {
   if (seconds === null) return;
-  etaHistory.push({ time: new Date(), seconds });
+  const now = new Date();
+  etaHistory.push({ t: now, s: seconds });
   if (etaHistory.length > MAX_POINTS) etaHistory.shift();
-
-  etaChart.data.labels = etaHistory.map(h => Math.round(h.seconds / 60) + (Math.round(h.seconds / 60) === 1 ? ' min' : ' min'));
-  etaChart.data.datasets[0].data = etaHistory.map(h => h.seconds);
+  etaChart.data.labels = etaHistory.map(h => {
+    const m = Math.floor(h.s / 60);
+    return m + 'm';
+  });
+  etaChart.data.datasets[0].data = etaHistory.map(h => h.s);
   etaChart.update();
 }
 
+// ── Helpers ──
 function formatTime(seconds) {
-  if (seconds < 0) return "Due";
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins} min ${secs.toString().padStart(2,'0')} s`;
+  if (seconds <= 0) return "Due";
+  const m = Math.floor(seconds / 60), s = seconds % 60;
+  return `${m}:${String(s).padStart(2,'0')}`;
 }
 
 function getChangeMarker(delta) {
-  if (delta > 0) return {symbol: '↑', class: 'up'};
-  if (delta < 0) return {symbol: '↓', class: 'down'};
-  return {symbol: '→', class: 'same'};
+  if (delta > 0) return { symbol: '↑', cls: 'up' };
+  if (delta < 0) return { symbol: '↓', cls: 'down' };
+  return { symbol: '→', cls: 'same' };
 }
 
-function renderBusesWithMarkers() {
-  let html = "";
-  let nextSeconds = null;
-
-  currentBuses.forEach((bus, i) => {
-    const timeStr = formatTime(bus.timeToStation);
-    let markersHtml = "";
-    let warningHtml = "";
-
-    if (i === 0) {
-      if (changeHistory.length > 0) {
-        markersHtml = '<div class="change-markers">';
-        changeHistory.slice(-10).forEach(ch => {
-          markersHtml += `<span class="marker ${ch.class}">${ch.symbol}</span>`;
-        });
-        markersHtml += '</div>';
-      }
-
-      if (consecutiveNoDecrease >= 8) {
-        warningHtml = '<span class="warning">⚠️</span>';
-      }
-    }
-
-    html += `<div class="bus-line">
-      <div class="bus">${timeStr}</div>
-      ${markersHtml}
-      ${warningHtml}
-    </div>`;
-
-    if (nextSeconds === null || bus.timeToStation < nextSeconds) nextSeconds = bus.timeToStation;
-  });
-
-  if (currentBuses.length === 0) {
-    html = '<div class="bus">No 413 buses scheduled right now</div>';
-  }
-
-  document.getElementById("buses").innerHTML = html;
-  updateBackground(nextSeconds);
+function updateBackground(nextSeconds) {
+  document.body.classList.remove("bg-red","bg-amber","bg-green","bg-yellow");
+  if (nextSeconds == null || nextSeconds > 360) document.body.classList.add("bg-red");
+  else if (nextSeconds < 120)                   document.body.classList.add("bg-yellow");
+  else if (nextSeconds >= 270)                  document.body.classList.add("bg-amber");
+  else                                           document.body.classList.add("bg-green");
 }
 
-function startCountdown() {
-  if (countdownInterval) clearInterval(countdownInterval);
-  countdownInterval = setInterval(() => {
-    currentBuses = currentBuses.map(b => ({
-      timeToStation: Math.max(0, b.timeToStation - 1)
-    }));
-    renderBusesWithMarkers();
-  }, 1000);
+function statusClass(severityCode) {
+  // TfL severity: 10 = Good, 0/1/2 = Suspended, others = disruption
+  if (severityCode === 10) return 'dot-good';
+  if (severityCode <= 3)   return 'dot-major';
+  return 'dot-minor';
+}
+function statusText(severity) {
+  if (severity === 10) return 'Good service';
+  if (severity <= 3)   return 'Severe disruption';
+  return 'Minor delays';
 }
 
+// ── Bus Load ──
 function resetProgressBar() {
   const bar = document.getElementById("progressBar");
   bar.style.animation = 'none';
@@ -301,109 +464,244 @@ function resetProgressBar() {
   bar.style.animation = 'countdown 15s linear forwards';
 }
 
-const url = `https://api.tfl.gov.uk/StopPoint/490010849N/Arrivals`;
-
-let wakeLock = null;
-async function requestWakeLock() {
-  try {
-    if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
-  } catch (err) {}
+function startCountdown() {
+  if (countdownInterval) clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    currentBuses = currentBuses.map(b => ({ timeToStation: Math.max(0, b.timeToStation - 1) }));
+    renderBuses();
+  }, 1000);
 }
 
-function updateBackground(nextSeconds) {
-  document.body.classList.remove("bg-red","bg-amber","bg-green","bg-yellow");
+function renderBuses() {
+  const next = currentBuses.length > 0 ? currentBuses[0].timeToStation : null;
 
-  if (nextSeconds == null || nextSeconds > 360) {
-    document.body.classList.add("bg-red");
-  } else if (nextSeconds < 120) {
-    document.body.classList.add("bg-yellow");
-  } else if (nextSeconds >= 270 && nextSeconds <= 360) {
-    document.body.classList.add("bg-amber");
-  } else {
-    document.body.classList.add("bg-green");
-  }
+  document.getElementById('busDisplay').textContent = next !== null ? formatTime(next) : '–';
+
+  // secondary chips
+  const sec = document.getElementById('busSecondary');
+  sec.innerHTML = currentBuses.slice(1).map(b =>
+    `<span class="bus-chip">${formatTime(b.timeToStation)}</span>`
+  ).join('');
+
+  // change markers
+  const cm = document.getElementById('changeMarkers');
+  cm.innerHTML = changeHistory.slice(-10).map(ch =>
+    `<span class="marker ${ch.cls}">${ch.symbol}</span>`
+  ).join('');
+  if (consecutiveNoDecrease >= 8) cm.innerHTML += '<span class="warning">⚠️</span>';
+
+  // footer
+  document.getElementById('busFooter').textContent =
+    currentBuses.length === 0 ? 'No 413 buses scheduled right now' :
+    currentBuses.length === 1 ? '1 bus tracked' :
+    `+${currentBuses.length - 1} following`;
+
+  updateBackground(next);
 }
 
-async function load() {
-  document.getElementById("errorMsg").textContent = "";
+async function loadBus() {
   resetProgressBar();
-
+  document.getElementById('busError').textContent = '';
   try {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`API ${r.status}`);
+    const r = await fetch(BUS_URL);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
 
     const buses = data
-      .filter(b => b.lineName === "413")
-      .sort((a, b) => a.timeToStation - b.timeToStation)
+      .filter(b => b.lineName === '413')
+      .sort((a,b) => a.timeToStation - b.timeToStation)
       .slice(0, 3);
 
-    let newChange = null;
     if (buses.length > 0 && previousTimes.length > 0) {
-      const oldNearest = previousTimes[0];
-      const newNearest = buses[0].timeToStation;
-      const delta = newNearest - oldNearest;
-      newChange = getChangeMarker(delta);
-      changeHistory.push(newChange);
-
-      if (delta <= 0) {
-        consecutiveNoDecrease = 0;
-      } else {
-        consecutiveNoDecrease++;
-      }
-
+      const delta = buses[0].timeToStation - previousTimes[0];
+      const ch = getChangeMarker(delta);
+      changeHistory.push(ch);
       if (changeHistory.length > 10) changeHistory.shift();
-    } else if (buses.length > 0) {
-      changeHistory = [];
-      consecutiveNoDecrease = 0;
+      consecutiveNoDecrease = delta > 0 ? consecutiveNoDecrease + 1 : 0;
+    } else {
+      changeHistory = []; consecutiveNoDecrease = 0;
     }
-
     previousTimes = buses.map(b => b.timeToStation);
+    currentBuses  = buses.map(b => ({ timeToStation: b.timeToStation }));
 
-    currentBuses = buses.map(b => ({ timeToStation: b.timeToStation }));
-
-    let lat = data.length > 0 ? data[0].latitude?.toFixed(6) : null;
-    let lon = data.length > 0 ? data[0].longitude?.toFixed(6) : null;
-    document.getElementById("location").textContent = 
-      lat && lon ? `Stop location: ${lat}, ${lon}` : "Stop location: Not available";
-
-    renderBusesWithMarkers();
+    renderBuses();
     updateChart(buses.length > 0 ? buses[0].timeToStation : null);
     startCountdown();
-
-  } catch (err) {
-    document.getElementById("buses").innerHTML = "Error loading arrivals";
-    document.getElementById("location").textContent = "Stop location: Unknown";
-    document.getElementById("errorMsg").textContent = `Failed: ${err.message}`;
+  } catch(err) {
+    document.getElementById('busError').textContent = `Bus error: ${err.message}`;
   }
 }
 
-// Toggle graph
-document.getElementById("toggleGraphBtn").addEventListener("click", () => {
-  graphVisible = !graphVisible;
-  const container = document.getElementById("graphContainer");
-  const btn = document.getElementById("toggleGraphBtn");
-  if (graphVisible) {
-    container.classList.remove("hidden");
-    btn.textContent = "📉";
-    btn.title = "Hide graph";
-  } else {
-    container.classList.add("hidden");
-    btn.textContent = "📊";
-    btn.title = "Show graph";
+// ── Tube & Rail Load ──
+function renderLineStatus(id, descId, severity, desc) {
+  const el = document.getElementById(id);
+  const dc = document.getElementById(descId);
+  if (!el) return;
+  const cls = statusClass(severity);
+  const txt = statusText(severity);
+  el.innerHTML = `<span class="dot ${cls}"></span>${txt}`;
+  if (dc) dc.textContent = desc || '';
+}
+
+async function loadTubeAndRail() {
+  try {
+    // Tube lines
+    const r = await fetch(TUBE_LINES_URL);
+    if (!r.ok) throw new Error('Tube API ' + r.status);
+    const lines = await r.json();
+
+    // Northern
+    const northern = lines.find(l => l.id === 'northern');
+    if (northern && northern.lineStatuses?.length) {
+      const s = northern.lineStatuses[0];
+      const disruptionDesc = s.disruption?.description || '';
+      // shorten desc for card
+      const short = disruptionDesc.length > 80 ? disruptionDesc.slice(0,80) + '…' : disruptionDesc;
+      renderLineStatus('northernStatus', 'northernDesc', s.statusSeverity, short);
+      // update link if disruption
+      if (s.statusSeverity < 10) {
+        document.getElementById('northernCard').href =
+          'https://tfl.gov.uk/tube/line/northern/status';
+      }
+    }
+
+    // Victoria
+    const victoria = lines.find(l => l.id === 'victoria');
+    if (victoria && victoria.lineStatuses?.length) {
+      const s = victoria.lineStatuses[0];
+      const disruptionDesc = s.disruption?.description || '';
+      const short = disruptionDesc.length > 80 ? disruptionDesc.slice(0,80) + '…' : disruptionDesc;
+      renderLineStatus('victoriaStatus', 'victoriaDesc', s.statusSeverity, short);
+      if (s.statusSeverity < 10) {
+        document.getElementById('victoriaCard').href =
+          'https://tfl.gov.uk/tube/line/victoria/status';
+      }
+    }
+
+    // All lines panel
+    if (allLinesVisible) renderAllLines(lines);
+    window._allTubeLines = lines; // cache
+
+  } catch(err) {
+    ['northernStatus','victoriaStatus'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = `<span class="dot dot-minor"></span>Unavailable`;
+    });
   }
+
+  // SW Rail — filter for routes touching Raynes Park / Waterloo area
+  try {
+    const r2 = await fetch(SW_RAIL_URL);
+    if (!r2.ok) throw new Error('Rail API ' + r2.status);
+    const railLines = await r2.json();
+
+    // SWR (South Western Railway) usually ID 'SWR' or similar
+    // We'll pick the worst severity among relevant operators
+    let worstSeverity = 10;
+    let worstDesc = '';
+    railLines.forEach(line => {
+      // Filter broadly for SWR, Thames Clipper, etc — key ones serving Waterloo
+      const name = (line.id || '').toLowerCase();
+      if (name.includes('swr') || name.includes('south-western') || name.includes('swt') ||
+          line.name?.toLowerCase().includes('south western')) {
+        if (line.lineStatuses?.length) {
+          const s = line.lineStatuses[0];
+          if (s.statusSeverity < worstSeverity) {
+            worstSeverity = s.statusSeverity;
+            worstDesc = s.disruption?.description || s.statusSeverityDescription || '';
+          }
+        }
+      }
+    });
+
+    // Also try a direct call for specific rail line if not found
+    if (worstSeverity === 10 && worstDesc === '') {
+      // Scan all for any Waterloo-area rail
+      railLines.forEach(line => {
+        if (line.lineStatuses?.length) {
+          const s = line.lineStatuses[0];
+          if (s.statusSeverity < worstSeverity) {
+            worstSeverity = s.statusSeverity;
+            worstDesc = line.name + ': ' + (s.disruption?.description || s.statusSeverityDescription || '');
+          }
+        }
+      });
+    }
+
+    const short = worstDesc.length > 90 ? worstDesc.slice(0,90) + '…' : worstDesc;
+    renderLineStatus('railStatus', 'railDesc', worstSeverity, short || (worstSeverity === 10 ? '' : 'Check National Rail for details'));
+
+    if (worstSeverity < 10) {
+      document.getElementById('railCard').href =
+        'https://www.nationalrail.co.uk/service-disruptions/';
+    } else {
+      document.getElementById('railCard').href =
+        'https://www.realtimetrains.co.uk/search/detailed/gb-nr:RAY/' +
+        new Date().toISOString().slice(0,10).replace(/-/g,'/') + '/1200/';
+    }
+
+  } catch(err) {
+    document.getElementById('railStatus').innerHTML =
+      `<span class="dot dot-minor"></span>Unavailable`;
+  }
+
+  document.getElementById('railUpdated').textContent =
+    'Rail/Tube: ' + new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+}
+
+// ── All Lines Panel ──
+function renderAllLines(lines) {
+  const grid = document.getElementById('linesGrid');
+  if (!lines || !lines.length) { grid.textContent = 'No data'; return; }
+
+  grid.innerHTML = lines.map(line => {
+    const colour = TUBE_COLOURS[line.id] || '#888';
+    const sev = line.lineStatuses?.[0]?.statusSeverity ?? 10;
+    const dotCls = statusClass(sev);
+    return `<div class="line-row">
+      <div class="line-pill" style="background:${colour};border:1px solid rgba(255,255,255,0.15)"></div>
+      <div class="line-name">${line.name}</div>
+      <span class="dot ${dotCls}" style="margin:0"></span>
+    </div>`;
+  }).join('');
+}
+
+// ── UI Toggles ──
+document.getElementById('toggleGraphBtn').addEventListener('click', () => {
+  graphVisible = !graphVisible;
+  document.getElementById('graphContainer').classList.toggle('hidden', !graphVisible);
+  document.getElementById('toggleGraphBtn').textContent = graphVisible ? '📉' : '📊';
 });
 
+document.getElementById('toggleLinesBtn').addEventListener('click', () => {
+  allLinesVisible = !allLinesVisible;
+  const panel = document.getElementById('allLinesPanel');
+  panel.classList.toggle('visible', allLinesVisible);
+  document.getElementById('toggleLinesBtn').textContent = allLinesVisible ? '🗺' : '🗺️';
+  if (allLinesVisible && window._allTubeLines) renderAllLines(window._allTubeLines);
+  else if (allLinesVisible) loadTubeAndRail();
+});
+
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  loadBus();
+  loadTubeAndRail();
+});
+
+// ── Wake Lock ──
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
+  } catch(e) {}
+}
+
+// ── Init ──
 initChart();
-load();
-setInterval(load, 15000);
-
-document.getElementById("refreshBtn").addEventListener("click", load);
-
+loadBus();
+loadTubeAndRail();
+setInterval(loadBus, 15000);
+setInterval(loadTubeAndRail, 60000);
 requestWakeLock();
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) requestWakeLock();
-});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) requestWakeLock(); });
 </script>
 </body>
 </html>
