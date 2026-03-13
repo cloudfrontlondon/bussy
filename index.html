@@ -321,6 +321,32 @@
     50%       { background-color: #ffe033; }
   }
 
+  /* ── Delay banner ── */
+  #delayBanner {
+    display: none;
+    background: #c00;
+    color: #fff;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    line-height: 1.5;
+    animation: bannerPulse 2s ease-in-out infinite;
+    cursor: pointer;
+  }
+  #delayBanner.visible { display: block; }
+  #delayBanner .banner-row { display: flex; align-items: baseline; gap: 8px; }
+  #delayBanner .banner-icon { font-size: 16px; }
+  #delayBanner .banner-lines { flex: 1; }
+  #delayBanner .banner-tap { font-size: 10px; opacity: 0.7; margin-top: 3px; }
+  @keyframes bannerPulse {
+    0%, 100% { background: #b00000; }
+    50%       { background: #e00000; }
+  }
+
   .error-msg { color: #ff6666; font-size: 12px; margin-top: 4px; }
 
   /* Tube line colours */
@@ -354,6 +380,15 @@
     <button id="refreshBtn" class="icon-btn" title="Refresh">🔄</button>
   </div>
 </header>
+
+<!-- Delay banner -->
+<div id="delayBanner">
+  <div class="banner-row">
+    <span class="banner-icon">⚠️</span>
+    <div class="banner-lines" id="bannerLines"></div>
+  </div>
+  <div class="banner-tap">Tap for details</div>
+</div>
 
 <!-- Bus panel -->
 <div id="busPanel">
@@ -427,6 +462,33 @@ const SW_RAIL_URL = 'https://api.tfl.gov.uk/Line/south-western-railway/Status';
 
 // vehicleIds still expected at checkpoint (haven't passed it yet)
 let vehiclesStillBeforeCheckpoint = new Set();
+
+// Delay state per service
+const delayState = { northern: null, victoria: null, rail: null };
+
+function updateDelayBanner() {
+  const issues = [];
+  if (delayState.northern && delayState.northern < 10)
+    issues.push({ label: 'Northern Line', url: 'https://tfl.gov.uk/tube/line/northern/status' });
+  if (delayState.victoria && delayState.victoria < 10)
+    issues.push({ label: 'Victoria Line', url: 'https://tfl.gov.uk/tube/line/victoria/status' });
+  if (delayState.rail && delayState.rail < 10)
+    issues.push({ label: 'SW Rail', url: 'https://www.journeycheck.com/swr/' });
+
+  const banner = document.getElementById('delayBanner');
+  const lines  = document.getElementById('bannerLines');
+
+  if (issues.length === 0) {
+    banner.classList.remove('visible');
+    banner.onclick = null;
+    return;
+  }
+
+  lines.innerHTML = issues.map(i => `<span style="margin-right:10px">🔴 ${i.label}</span>`).join('');
+  banner.classList.add('visible');
+  // tap opens first affected service
+  banner.onclick = () => window.open(issues[0].url, '_blank');
+}
 
 // Tube line colours for pill
 const TUBE_COLOURS = {
