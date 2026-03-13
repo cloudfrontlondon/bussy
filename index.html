@@ -709,7 +709,7 @@ async function loadBus() {
 }
 
 // ── Tube & Rail Load ──
-function renderLineStatus(statusId, descId, severity, desc, cardId) {
+function renderLineStatus(statusId, descId, severity, desc, cardId, serviceKey) {
   const el = document.getElementById(statusId);
   const dc = document.getElementById(descId);
   const card = cardId ? document.getElementById(cardId) : null;
@@ -718,8 +718,9 @@ function renderLineStatus(statusId, descId, severity, desc, cardId) {
   const txt = statusText(severity);
   el.innerHTML = `<span class="dot ${cls}"></span>${txt}`;
   if (dc) dc.textContent = desc || '';
-  // flash card/sub red if any disruption
   if (card) card.classList.toggle('card-delay', severity < 10);
+  // track for banner
+  if (serviceKey) { delayState[serviceKey] = severity; updateDelayBanner(); }
 }
 
 async function loadTubeAndRail() {
@@ -736,7 +737,7 @@ async function loadTubeAndRail() {
       const disruptionDesc = s.disruption?.description || '';
       // shorten desc for card
       const short = disruptionDesc.length > 80 ? disruptionDesc.slice(0,80) + '…' : disruptionDesc;
-      renderLineStatus('northernStatus', 'northernDesc', s.statusSeverity, short, 'northernCard');
+      renderLineStatus('northernStatus', 'northernDesc', s.statusSeverity, short, 'northernCard', 'northern');
       // update link if disruption
       if (s.statusSeverity < 10) {
         document.getElementById('northernCard').href =
@@ -750,7 +751,7 @@ async function loadTubeAndRail() {
       const s = victoria.lineStatuses[0];
       const disruptionDesc = s.disruption?.description || '';
       const short = disruptionDesc.length > 80 ? disruptionDesc.slice(0,80) + '…' : disruptionDesc;
-      renderLineStatus('victoriaStatus', 'victoriaDesc', s.statusSeverity, short, 'victoriaCard');
+      renderLineStatus('victoriaStatus', 'victoriaDesc', s.statusSeverity, short, 'victoriaCard', 'victoria');
       if (s.statusSeverity < 10) {
         document.getElementById('victoriaCard').href =
           'https://tfl.gov.uk/tube/line/victoria/status';
@@ -774,14 +775,20 @@ async function loadTubeAndRail() {
     if (!r2.ok) throw new Error('Rail API ' + r2.status);
     const railData = await r2.json();
 
-    // railData is an array (single line), get first item's status
     const line = Array.isArray(railData) ? railData[0] : railData;
     const s = line?.lineStatuses?.[0];
-    const severity = s?.statusSeverity ?? 10;
+
+    // TfL national rail uses different severity codes — treat as disrupted if
+    // severity !== 10 OR statusSeverityDescription isn't "Good Service"
+    const rawSeverity = s?.statusSeverity ?? 10;
+    const severityDesc = (s?.statusSeverityDescription || '').toLowerCase();
+    const isGood = rawSeverity === 10 && severityDesc.includes('good');
+    const severity = isGood ? 10 : Math.min(rawSeverity, 5); // force non-good into disruption range
+
     const desc = s?.disruption?.description || s?.statusSeverityDescription || '';
     const short = desc.length > 90 ? desc.slice(0,90) + '…' : desc;
 
-    renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard');
+    renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard', 'rail');
 
     document.getElementById('railCard').href = severity < 10
       ? 'https://www.journeycheck.com/swr/'
@@ -789,11 +796,13 @@ async function loadTubeAndRail() {
         new Date().toISOString().slice(0,10).replace(/-/g,'/') + '/1200/';
 
   } catch(err) {
-    // Fallback: link to JourneyCheck SWR
     document.getElementById('railStatus').innerHTML =
       `<span class="dot dot-minor"></span>Tap to check`;
     document.getElementById('railDesc').textContent = 'Could not load automatically';
     document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/';
+    // assume disruption if API failed — better to false-positive than miss it
+    delayState.rail = 5;
+    updateDelayBanner();
   }
 
   document.getElementById('railUpdated').textContent =
