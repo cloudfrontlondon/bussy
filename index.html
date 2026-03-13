@@ -453,17 +453,17 @@
 // ── Constants ──
 const BUS_STOP = '490010849N';
 const BUS_URL  = `https://api.tfl.gov.uk/StopPoint/${BUS_STOP}/Arrivals`;
-// Morden Park Baptist Church — 2 stops before Parkway. Green suppressed until bus clears this.
 const CHECKPOINT_STOP = '490009424N';
 const CHECKPOINT_URL  = `https://api.tfl.gov.uk/StopPoint/${CHECKPOINT_STOP}/Arrivals`;
 const TUBE_LINES_URL = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
 const SW_RAIL_TFL_URL = 'https://api.tfl.gov.uk/Line/south-western-railway/Status';
 
-// RTT credentials from URL params — e.g. ?rttuser=xxx&rttpass=yyy
+// TransportAPI credentials from URL params — ?tapp_id=xxx&tapp_key=yyy
+// Free plan = 30 requests/day so rail refreshes every 45 mins to stay safe
 const _urlParams = new URLSearchParams(window.location.search);
-const RTT_USER = _urlParams.get('rttuser');
-const RTT_PASS = _urlParams.get('rttpass');
-const RTT_URL  = 'https://api.rtt.io/api/v1/json/search/RAY/to/WAT';
+const TAPI_ID  = _urlParams.get('tapp_id');
+const TAPI_KEY = _urlParams.get('tapp_key');
+const TAPI_URL = 'https://transportapi.com/v3/uk/train/station/RAY/live.json';
 
 // vehicleIds still expected at checkpoint (haven't passed it yet)
 let vehiclesStillBeforeCheckpoint = new Set();
@@ -473,11 +473,11 @@ const delayState = { northern: null, victoria: null, rail: null };
 
 function updateDelayBanner() {
   const issues = [];
-  if (delayState.northern && delayState.northern < 10)
+  if (delayState.northern !== null && delayState.northern < 10)
     issues.push({ label: 'Northern Line', url: 'https://tfl.gov.uk/tube/line/northern/status' });
-  if (delayState.victoria && delayState.victoria < 10)
+  if (delayState.victoria !== null && delayState.victoria < 10)
     issues.push({ label: 'Victoria Line', url: 'https://tfl.gov.uk/tube/line/victoria/status' });
-  if (delayState.rail && delayState.rail < 10)
+  if (delayState.rail !== null && delayState.rail < 10)
     issues.push({ label: 'SW Rail', url: 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT' });
 
   const banner = document.getElementById('delayBanner');
@@ -714,52 +714,44 @@ async function loadBus() {
 }
 
 // ── Rail loaders ──
-async function loadRailFromRTT() {
-  const r = await fetch(RTT_URL, {
-    headers: { 'Authorization': 'Basic ' + btoa(RTT_USER + ':' + RTT_PASS) }
-  });
-  if (!r.ok) throw new Error('RTT ' + r.status);
+async function loadRailFromTransportAPI() {
+  const url = `${TAPI_URL}?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=WAT&train_status=passenger&type=departure`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('TransportAPI ' + r.status);
   const data = await r.json();
 
-  // Find the next departure to Waterloo
-  const services = (data.services || []).filter(s =>
-    s.locationDetail?.destination?.some(d => d.tiploc === 'WATLOO' || d.description?.includes('Waterloo'))
+  const services = (data.departures?.all || []).filter(s =>
+    s.operator === 'SW' && s.destination_name?.includes('Waterloo')
   );
 
   if (!services.length) {
-    renderLineStatus('railStatus', 'railDesc', 10, 'No upcoming departures found', 'railCard', 'rail');
+    renderLineStatus('railStatus', 'railDesc', 10, 'No upcoming SWR departures', 'railCard', 'rail');
     return;
   }
 
   const next = services[0];
-  const loc  = next.locationDetail;
-
-  // RTT gives gbttBookedDeparture and realtimeDeparture (HHMM strings)
-  const booked   = loc.gbttBookedDeparture;
-  const realtime = loc.realtimeDeparture;
-  const cancelled = loc.realtimeCancelled || next.isCancelled;
+  const status = next.status; // "ON TIME", "LATE", "EARLY", "CANCELLED"
+  const aimed  = next.aimed_departure_time;
+  const expected = next.expected_departure_time;
+  const minsAway = next.best_departure_estimate_mins;
 
   let severity, desc;
 
-  if (cancelled) {
+  if (status === 'CANCELLED') {
     severity = 1;
-    desc = `${booked} service CANCELLED`;
-  } else if (booked && realtime && realtime !== booked) {
-    // parse delay in minutes
-    const bMins = parseInt(booked.slice(0,2))*60 + parseInt(booked.slice(2,4));
-    const rMins = parseInt(realtime.slice(0,2))*60 + parseInt(realtime.slice(2,4));
-    let delay = rMins - bMins;
-    if (delay < -60) delay += 1440; // handle midnight rollover
-    if (delay > 0) {
-      severity = delay >= 10 ? 3 : 6;
-      desc = `${booked} dep — ${delay} min late (exp ${realtime.slice(0,2)}:${realtime.slice(2,4)})`;
-    } else {
-      severity = 10;
-      desc = `${booked} dep on time`;
-    }
+    desc = `${aimed} CANCELLED`;
+  } else if (status === 'LATE') {
+    // calculate delay
+    const toMins = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+    const delay = expected ? toMins(expected) - toMins(aimed) : '?';
+    severity = delay >= 10 ? 3 : 6;
+    desc = `${aimed} dep — ${delay} min late${minsAway != null ? ` · ${minsAway} min away` : ''}`;
+  } else if (status === 'EARLY') {
+    severity = 10; // early is fine
+    desc = `${aimed} dep — running early · ${minsAway} min away`;
   } else {
     severity = 10;
-    desc = booked ? `${booked.slice(0,2)}:${booked.slice(2,4)} dep — on time` : 'On time';
+    desc = `${aimed} dep — on time · ${minsAway != null ? minsAway + ' min away' : ''}`;
   }
 
   renderLineStatus('railStatus', 'railDesc', severity, desc, 'railCard', 'rail');
@@ -783,6 +775,7 @@ async function loadRailFromTfL() {
   renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard', 'rail');
   document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
 }
+
 
 
 function renderLineStatus(statusId, descId, severity, desc, cardId, serviceKey) {
@@ -848,10 +841,10 @@ async function loadTubeAndRail() {
     });
   }
 
-  // SW Rail — use RTT if creds available, otherwise fall back to TfL
+  // SW Rail — use TransportAPI if creds available (30 req/day free), else TfL fallback
   try {
-    if (RTT_USER && RTT_PASS) {
-      await loadRailFromRTT();
+    if (TAPI_ID && TAPI_KEY) {
+      await loadRailFromTransportAPI();
     } else {
       await loadRailFromTfL();
     }
@@ -915,7 +908,12 @@ initChart();
 loadBus();
 loadTubeAndRail();
 setInterval(loadBus, 15000);
-setInterval(loadTubeAndRail, 60000);
+setInterval(loadTubeAndRail, 60000); // tube every 60s (TfL, no quota)
+// Rail via TransportAPI = 30 req/day free — 5 min refresh = ~8 req per 40min session
+setInterval(() => {
+  if (TAPI_ID && TAPI_KEY) loadRailFromTransportAPI().catch(() => {});
+  else loadRailFromTfL().catch(() => {});
+}, 5 * 60 * 1000);
 requestWakeLock();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) requestWakeLock(); });
 </script>
