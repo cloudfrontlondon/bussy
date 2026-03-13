@@ -401,8 +401,6 @@
   <div class="error-msg" id="busError"></div>
 </div>
 
-<!-- Debug panel -->
-<div id="debugPanel" style="background:rgba(0,0,0,0.7);border:1px solid #444;border-radius:8px;padding:10px;margin-bottom:10px;font-family:monospace;font-size:11px;color:#0f0;word-break:break-all;display:none;"></div>
 <div class="transit-grid">
   <a class="transit-card" id="northernCard"
      style="border-top-color: #888;"
@@ -459,7 +457,13 @@ const BUS_URL  = `https://api.tfl.gov.uk/StopPoint/${BUS_STOP}/Arrivals`;
 const CHECKPOINT_STOP = '490009424N';
 const CHECKPOINT_URL  = `https://api.tfl.gov.uk/StopPoint/${CHECKPOINT_STOP}/Arrivals`;
 const TUBE_LINES_URL = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
-const SW_RAIL_URL = 'https://api.tfl.gov.uk/Line/south-western-railway/Status';
+const SW_RAIL_TFL_URL = 'https://api.tfl.gov.uk/Line/south-western-railway/Status';
+
+// RTT credentials from URL params — e.g. ?rttuser=xxx&rttpass=yyy
+const _urlParams = new URLSearchParams(window.location.search);
+const RTT_USER = _urlParams.get('rttuser');
+const RTT_PASS = _urlParams.get('rttpass');
+const RTT_URL  = 'https://api.rtt.io/api/v1/json/search/RAY/to/WAT';
 
 // vehicleIds still expected at checkpoint (haven't passed it yet)
 let vehiclesStillBeforeCheckpoint = new Set();
@@ -709,7 +713,78 @@ async function loadBus() {
   }
 }
 
-// ── Tube & Rail Load ──
+// ── Rail loaders ──
+async function loadRailFromRTT() {
+  const r = await fetch(RTT_URL, {
+    headers: { 'Authorization': 'Basic ' + btoa(RTT_USER + ':' + RTT_PASS) }
+  });
+  if (!r.ok) throw new Error('RTT ' + r.status);
+  const data = await r.json();
+
+  // Find the next departure to Waterloo
+  const services = (data.services || []).filter(s =>
+    s.locationDetail?.destination?.some(d => d.tiploc === 'WATLOO' || d.description?.includes('Waterloo'))
+  );
+
+  if (!services.length) {
+    renderLineStatus('railStatus', 'railDesc', 10, 'No upcoming departures found', 'railCard', 'rail');
+    return;
+  }
+
+  const next = services[0];
+  const loc  = next.locationDetail;
+
+  // RTT gives gbttBookedDeparture and realtimeDeparture (HHMM strings)
+  const booked   = loc.gbttBookedDeparture;
+  const realtime = loc.realtimeDeparture;
+  const cancelled = loc.realtimeCancelled || next.isCancelled;
+
+  let severity, desc;
+
+  if (cancelled) {
+    severity = 1;
+    desc = `${booked} service CANCELLED`;
+  } else if (booked && realtime && realtime !== booked) {
+    // parse delay in minutes
+    const bMins = parseInt(booked.slice(0,2))*60 + parseInt(booked.slice(2,4));
+    const rMins = parseInt(realtime.slice(0,2))*60 + parseInt(realtime.slice(2,4));
+    let delay = rMins - bMins;
+    if (delay < -60) delay += 1440; // handle midnight rollover
+    if (delay > 0) {
+      severity = delay >= 10 ? 3 : 6;
+      desc = `${booked} dep — ${delay} min late (exp ${realtime.slice(0,2)}:${realtime.slice(2,4)})`;
+    } else {
+      severity = 10;
+      desc = `${booked} dep on time`;
+    }
+  } else {
+    severity = 10;
+    desc = booked ? `${booked.slice(0,2)}:${booked.slice(2,4)} dep — on time` : 'On time';
+  }
+
+  renderLineStatus('railStatus', 'railDesc', severity, desc, 'railCard', 'rail');
+  document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
+}
+
+async function loadRailFromTfL() {
+  const r = await fetch(SW_RAIL_TFL_URL);
+  if (!r.ok) throw new Error('TfL rail ' + r.status);
+  const railData = await r.json();
+
+  const line = Array.isArray(railData) ? railData[0] : railData;
+  const s = line?.lineStatuses?.[0];
+  const rawSeverity = s?.statusSeverity ?? 10;
+  const severityDesc = (s?.statusSeverityDescription || '').toLowerCase();
+  const isGood = rawSeverity === 10 && severityDesc.includes('good');
+  const severity = isGood ? 10 : Math.min(rawSeverity, 5);
+  const desc = s?.disruption?.description || s?.statusSeverityDescription || '';
+  const short = desc.length > 90 ? desc.slice(0,90) + '…' : desc;
+
+  renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard', 'rail');
+  document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
+}
+
+
 function renderLineStatus(statusId, descId, severity, desc, cardId, serviceKey) {
   const el = document.getElementById(statusId);
   const dc = document.getElementById(descId);
@@ -724,10 +799,6 @@ function renderLineStatus(statusId, descId, severity, desc, cardId, serviceKey) 
   if (serviceKey) {
     delayState[serviceKey] = severity;
     updateDelayBanner();
-    const dbg = document.getElementById('debugPanel');
-    if (dbg && dbg.style.display !== 'none') {
-      dbg.textContent += ` | delayState: ${JSON.stringify(delayState)} | bannerVisible: ${document.getElementById('delayBanner').classList.contains('visible')}`;
-    }
   }
 }
 
@@ -777,42 +848,17 @@ async function loadTubeAndRail() {
     });
   }
 
-  // SW Rail — direct call for south-western-railway line
+  // SW Rail — use RTT if creds available, otherwise fall back to TfL
   try {
-    const r2 = await fetch(SW_RAIL_URL);
-    if (!r2.ok) throw new Error('Rail API ' + r2.status);
-    const railData = await r2.json();
-
-    const line = Array.isArray(railData) ? railData[0] : railData;
-    const s = line?.lineStatuses?.[0];
-
-    // DEBUG panel
-    const dbg = document.getElementById('debugPanel');
-    dbg.style.display = 'block';
-    dbg.textContent = `SWR → severity: ${s?.statusSeverity} | desc: "${s?.statusSeverityDescription}" | disruption: ${!!s?.disruption} | lineStatuses count: ${line?.lineStatuses?.length}`;
-
-    // TfL national rail uses different severity codes — treat as disrupted if
-    // severity !== 10 OR statusSeverityDescription isn't "Good Service"
-    const rawSeverity = s?.statusSeverity ?? 10;
-    const severityDesc = (s?.statusSeverityDescription || '').toLowerCase();
-    const isGood = rawSeverity === 10 && severityDesc.includes('good');
-    const severity = isGood ? 10 : Math.min(rawSeverity, 5); // force non-good into disruption range
-
-    const desc = s?.disruption?.description || s?.statusSeverityDescription || '';
-    const short = desc.length > 90 ? desc.slice(0,90) + '…' : desc;
-
-    renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard', 'rail');
-
-    document.getElementById('railCard').href = severity < 10
-      ? 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT'
-      : 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
-
+    if (RTT_USER && RTT_PASS) {
+      await loadRailFromRTT();
+    } else {
+      await loadRailFromTfL();
+    }
   } catch(err) {
-    document.getElementById('railStatus').innerHTML =
-      `<span class="dot dot-minor"></span>Tap to check`;
-    document.getElementById('railDesc').textContent = 'Could not load automatically';
+    document.getElementById('railStatus').innerHTML = `<span class="dot dot-minor"></span>Tap to check`;
+    document.getElementById('railDesc').textContent = 'Could not load';
     document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/search?from=RAY&to=WAT';
-    // don't set delayState here — API failure shouldn't trigger banner
   }
 
   document.getElementById('railUpdated').textContent =
