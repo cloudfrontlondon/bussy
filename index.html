@@ -133,11 +133,23 @@
     border-radius: 14px;
     padding: 14px;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.3s, border-color 0.3s;
     text-decoration: none;
     display: block;
+    border-top-width: 4px;
   }
   .transit-card:hover { background: rgba(255,255,255,0.07); }
+
+  /* delay state — red flash on the card */
+  .transit-card.card-delay {
+    background: rgba(180, 0, 0, 0.18);
+    border-color: #c00;
+    animation: cardAlarm 2s ease-in-out infinite;
+  }
+  @keyframes cardAlarm {
+    0%, 100% { background: rgba(180,0,0,0.18); }
+    50%       { background: rgba(220,0,0,0.32); }
+  }
 
   .transit-card .tc-label {
     font-size: 10px;
@@ -251,11 +263,17 @@
     to   { transform: scaleX(0); }
   }
 
-  /* ── Background tints ── */
-  body.bg-red    { background-color: #1a0505; }
-  body.bg-amber  { background-color: #1a0d00; }
-  body.bg-green  { background-color: #051a09; }
-  body.bg-yellow { background-color: #1a1500; }
+  /* ── Background tints — vivid enough to read from across the room ── */
+  body { transition: background-color 0.6s ease; }
+  body.bg-red    { background-color: #5c0000; }
+  body.bg-amber  { background-color: #6b3800; }
+  body.bg-green  { background-color: #004d1a; }
+  body.bg-yellow { background-color: #5c4a00; animation: urgentPulse 1.2s ease-in-out infinite; }
+
+  @keyframes urgentPulse {
+    0%, 100% { background-color: #5c4a00; }
+    50%       { background-color: #a07e00; }
+  }
 
   .error-msg { color: #ff6666; font-size: 12px; margin-top: 4px; }
 
@@ -304,6 +322,7 @@
 <!-- Rail + Tube cards -->
 <div class="transit-grid">
   <a class="transit-card" id="railCard"
+     style="border-top-color: #e05206;"
      href="https://www.nationalrail.co.uk/service-disruptions/"
      target="_blank" rel="noopener">
     <div class="tc-label">🚆 SW Rail</div>
@@ -312,6 +331,7 @@
     <div class="tc-desc" id="railDesc"></div>
   </a>
   <a class="transit-card" id="northernCard"
+     style="border-top-color: #888;"
      href="https://tfl.gov.uk/tube/stop/940GZZLUMDN/morden-underground-station"
      target="_blank" rel="noopener">
     <div class="tc-label">🚇 Northern Line</div>
@@ -320,6 +340,7 @@
     <div class="tc-desc" id="northernDesc"></div>
   </a>
   <a class="transit-card" id="victoriaCard"
+     style="border-top-color: #0098D4;"
      href="https://tfl.gov.uk/tube/line/victoria/status"
      target="_blank" rel="noopener">
     <div class="tc-label">🚇 Victoria Line</div>
@@ -353,7 +374,8 @@
 const BUS_STOP = '490010849N';
 const BUS_URL  = `https://api.tfl.gov.uk/StopPoint/${BUS_STOP}/Arrivals`;
 const TUBE_LINES_URL = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
-const SW_RAIL_URL = 'https://api.tfl.gov.uk/Line/Mode/national-rail/Status';
+// TfL correct ID for South Western Railway is 'south-western-railway'
+const SW_RAIL_URL = 'https://api.tfl.gov.uk/Line/south-western-railway/Status';
 
 // Tube line colours for pill
 const TUBE_COLOURS = {
@@ -533,14 +555,17 @@ async function loadBus() {
 }
 
 // ── Tube & Rail Load ──
-function renderLineStatus(id, descId, severity, desc) {
-  const el = document.getElementById(id);
+function renderLineStatus(statusId, descId, severity, desc, cardId) {
+  const el = document.getElementById(statusId);
   const dc = document.getElementById(descId);
+  const card = cardId ? document.getElementById(cardId) : null;
   if (!el) return;
   const cls = statusClass(severity);
   const txt = statusText(severity);
   el.innerHTML = `<span class="dot ${cls}"></span>${txt}`;
   if (dc) dc.textContent = desc || '';
+  // flash card red if any disruption
+  if (card) card.classList.toggle('card-delay', severity < 10);
 }
 
 async function loadTubeAndRail() {
@@ -557,7 +582,7 @@ async function loadTubeAndRail() {
       const disruptionDesc = s.disruption?.description || '';
       // shorten desc for card
       const short = disruptionDesc.length > 80 ? disruptionDesc.slice(0,80) + '…' : disruptionDesc;
-      renderLineStatus('northernStatus', 'northernDesc', s.statusSeverity, short);
+      renderLineStatus('northernStatus', 'northernDesc', s.statusSeverity, short, 'northernCard');
       // update link if disruption
       if (s.statusSeverity < 10) {
         document.getElementById('northernCard').href =
@@ -571,7 +596,7 @@ async function loadTubeAndRail() {
       const s = victoria.lineStatuses[0];
       const disruptionDesc = s.disruption?.description || '';
       const short = disruptionDesc.length > 80 ? disruptionDesc.slice(0,80) + '…' : disruptionDesc;
-      renderLineStatus('victoriaStatus', 'victoriaDesc', s.statusSeverity, short);
+      renderLineStatus('victoriaStatus', 'victoriaDesc', s.statusSeverity, short, 'victoriaCard');
       if (s.statusSeverity < 10) {
         document.getElementById('victoriaCard').href =
           'https://tfl.gov.uk/tube/line/victoria/status';
@@ -589,60 +614,32 @@ async function loadTubeAndRail() {
     });
   }
 
-  // SW Rail — filter for routes touching Raynes Park / Waterloo area
+  // SW Rail — direct call for south-western-railway line
   try {
     const r2 = await fetch(SW_RAIL_URL);
     if (!r2.ok) throw new Error('Rail API ' + r2.status);
-    const railLines = await r2.json();
+    const railData = await r2.json();
 
-    // SWR (South Western Railway) usually ID 'SWR' or similar
-    // We'll pick the worst severity among relevant operators
-    let worstSeverity = 10;
-    let worstDesc = '';
-    railLines.forEach(line => {
-      // Filter broadly for SWR, Thames Clipper, etc — key ones serving Waterloo
-      const name = (line.id || '').toLowerCase();
-      if (name.includes('swr') || name.includes('south-western') || name.includes('swt') ||
-          line.name?.toLowerCase().includes('south western')) {
-        if (line.lineStatuses?.length) {
-          const s = line.lineStatuses[0];
-          if (s.statusSeverity < worstSeverity) {
-            worstSeverity = s.statusSeverity;
-            worstDesc = s.disruption?.description || s.statusSeverityDescription || '';
-          }
-        }
-      }
-    });
+    // railData is an array (single line), get first item's status
+    const line = Array.isArray(railData) ? railData[0] : railData;
+    const s = line?.lineStatuses?.[0];
+    const severity = s?.statusSeverity ?? 10;
+    const desc = s?.disruption?.description || s?.statusSeverityDescription || '';
+    const short = desc.length > 90 ? desc.slice(0,90) + '…' : desc;
 
-    // Also try a direct call for specific rail line if not found
-    if (worstSeverity === 10 && worstDesc === '') {
-      // Scan all for any Waterloo-area rail
-      railLines.forEach(line => {
-        if (line.lineStatuses?.length) {
-          const s = line.lineStatuses[0];
-          if (s.statusSeverity < worstSeverity) {
-            worstSeverity = s.statusSeverity;
-            worstDesc = line.name + ': ' + (s.disruption?.description || s.statusSeverityDescription || '');
-          }
-        }
-      });
-    }
+    renderLineStatus('railStatus', 'railDesc', severity, short, 'railCard');
 
-    const short = worstDesc.length > 90 ? worstDesc.slice(0,90) + '…' : worstDesc;
-    renderLineStatus('railStatus', 'railDesc', worstSeverity, short || (worstSeverity === 10 ? '' : 'Check National Rail for details'));
-
-    if (worstSeverity < 10) {
-      document.getElementById('railCard').href =
-        'https://www.nationalrail.co.uk/service-disruptions/';
-    } else {
-      document.getElementById('railCard').href =
-        'https://www.realtimetrains.co.uk/search/detailed/gb-nr:RAY/' +
+    document.getElementById('railCard').href = severity < 10
+      ? 'https://www.journeycheck.com/swr/'
+      : 'https://www.realtimetrains.co.uk/search/detailed/gb-nr:RAY/' +
         new Date().toISOString().slice(0,10).replace(/-/g,'/') + '/1200/';
-    }
 
   } catch(err) {
+    // Fallback: link to JourneyCheck SWR
     document.getElementById('railStatus').innerHTML =
-      `<span class="dot dot-minor"></span>Unavailable`;
+      `<span class="dot dot-minor"></span>Tap to check`;
+    document.getElementById('railDesc').textContent = 'Could not load automatically';
+    document.getElementById('railCard').href = 'https://www.journeycheck.com/swr/';
   }
 
   document.getElementById('railUpdated').textContent =
