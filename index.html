@@ -70,7 +70,7 @@
   #delayBanner .banner-tap { font-size: 10px; opacity: 0.7; margin-top: 3px; }
   @keyframes bannerPulse { 0%,100%{background:#b00000} 50%{background:#e00000} }
 
-  /* ── Bus panel — colourised, not body ── */
+  /* ── Bus panel — colourised panel, not body ── */
   #busPanel {
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 16px; padding: 16px; margin-bottom: 12px;
@@ -128,7 +128,7 @@
   }
   .rail-refresh-btn:hover { color: #fff; }
 
-  /* ── All lines ── */
+  /* ── All lines panel ── */
   #allLinesPanel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; display: none; }
   #allLinesPanel.visible { display: block; }
   .lines-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
@@ -303,6 +303,7 @@
 <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
 
 <script>
+// ── Direction config ──
 const DIRECTIONS = {
   outbound: {
     title:'Elm Walk → London', subtitle:'413 · Outbound',
@@ -321,14 +322,17 @@ const DIRECTIONS = {
     showOtherBuses:true, northernDirection:'northbound', victoriaDirection:'northbound',
   }
 };
+
 const RAIL_STATIONS = {
-  VXH:{code:'VXH',name:'Vauxhall → Raynes Pk',  journeyCheck:'https://www.journeycheck.com/swr/search?from=VXH&to=RAY'},
-  WAT:{code:'WAT',name:'Waterloo → Raynes Pk', journeyCheck:'https://www.journeycheck.com/swr/search?from=WAT&to=RAY'},
+  VXH:{code:'VXH', name:'Vauxhall → Raynes Pk',  journeyCheck:'https://www.journeycheck.com/swr/search?from=VXH&to=RAY'},
+  WAT:{code:'WAT', name:'Waterloo → Raynes Pk', journeyCheck:'https://www.journeycheck.com/swr/search?from=WAT&to=RAY'},
 };
+
 const BUS_MODES = {
-  '413':{label:'🚌 Bus 413 · To Raynes Park',busStop:'490010018J',checkpoint:'490009424S',checkpointName:'Morden Park Baptist Church',lineName:'413'},
-  '163':{label:'🚌 Bus 163 · From Raynes Park',busStop:'490001237G',checkpoint:null,checkpointName:null,lineName:'163'},
+  '413':{label:'🚌 Bus 413 · To Raynes Park', busStop:'490010018J', checkpoint:'490009424S', checkpointName:'Morden Park Baptist Church', lineName:'413'},
+  '163':{label:'🚌 Bus 163 · From Raynes Park', busStop:'490001237G', checkpoint:null, checkpointName:null, lineName:'163'},
 };
+
 const TUBE_COLOURS = {
   'bakerloo':'#894E24','central':'#E32017','circle':'#FFD300','district':'#00782A',
   'hammersmith-city':'#F3A9BB','jubilee':'#A0A5A9','metropolitan':'#9B0056','northern':'#333333',
@@ -336,340 +340,406 @@ const TUBE_COLOURS = {
   'overground':'#EE7C0E','dlr':'#00A4A7',
 };
 
-let currentDirection='outbound', returnRailStation='VXH', returnBusMode='413';
-const cfg=()=>DIRECTIONS[currentDirection];
-function getRailCfg(){
-  if(currentDirection!=='return') return cfg();
-  const s=RAIL_STATIONS[returnRailStation];
-  return {...cfg(),railFrom:s.code,railName:s.name,journeyCheck:s.journeyCheck};
+let currentDirection = 'outbound';
+let returnRailStation = 'VXH';
+let returnBusMode = '413';
+
+const cfg = () => DIRECTIONS[currentDirection];
+
+function getRailCfg() {
+  if (currentDirection !== 'return') return cfg();
+  const s = RAIL_STATIONS[returnRailStation];
+  return {...cfg(), railFrom:s.code, railName:s.name, journeyCheck:s.journeyCheck};
 }
 
-const _p=new URLSearchParams(window.location.search);
-const TAPI_ID=_p.get('tapp_id'), TAPI_KEY=_p.get('tapp_key');
-const TUBE_LINES_URL='https://api.tfl.gov.uk/Line/Mode/tube/Status';
+const _p = new URLSearchParams(window.location.search);
+const TAPI_ID  = _p.get('tapp_id');
+const TAPI_KEY = _p.get('tapp_key');
 
-let vehiclesStillBeforeCheckpoint=new Set();
-const delayState={northern:null,victoria:null,rail:null};
-let etaHistory=[],etaChart,countdownInterval=null;
-let currentBuses=[],previousTimes=[],changeHistory=[],consecutiveNoDecrease=0;
-let graphVisible=true,allLinesVisible=false;
-const MAX_POINTS=20;
+const TUBE_LINES_URL = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
+
+let vehiclesStillBeforeCheckpoint = new Set();
+const delayState = {northern:null, victoria:null, rail:null};
+let etaHistory = [], etaChart, countdownInterval = null;
+let currentBuses = [], previousTimes = [], changeHistory = [], consecutiveNoDecrease = 0;
+let graphVisible = true, allLinesVisible = false;
+const MAX_POINTS = 20;
 
 // ── Chart ──
-function initChart(){
-  etaChart=new Chart(document.getElementById('etaChart').getContext('2d'),{
+function initChart() {
+  etaChart = new Chart(document.getElementById('etaChart').getContext('2d'), {
     type:'line',
-    data:{labels:[],datasets:[{label:'Bus ETA (s)',data:[],borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,0.15)',tension:0.4,fill:true,pointRadius:3}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      scales:{y:{beginAtZero:false,ticks:{color:'#666'},grid:{color:'rgba(255,255,255,0.05)'}},
-              x:{ticks:{color:'#666',maxTicksLimit:7},grid:{display:false}}},
-      plugins:{legend:{labels:{color:'#888',font:{size:11}}}}}
+    data:{labels:[], datasets:[{label:'Bus ETA (s)', data:[], borderColor:'#4ade80', backgroundColor:'rgba(74,222,128,0.15)', tension:0.4, fill:true, pointRadius:3}]},
+    options:{responsive:true, maintainAspectRatio:false,
+      scales:{
+        y:{beginAtZero:false, ticks:{color:'#666'}, grid:{color:'rgba(255,255,255,0.05)'}},
+        x:{ticks:{color:'#666', maxTicksLimit:7}, grid:{display:false}}
+      },
+      plugins:{legend:{labels:{color:'#888', font:{size:11}}}}}
   });
 }
-function updateChart(s){
-  if(s===null)return;
-  etaHistory.push({t:new Date(),s});
-  if(etaHistory.length>MAX_POINTS)etaHistory.shift();
-  etaChart.data.labels=etaHistory.map(h=>Math.floor(h.s/60)+'m');
-  etaChart.data.datasets[0].data=etaHistory.map(h=>h.s);
+
+function updateChart(s) {
+  if (s === null) return;
+  etaHistory.push({t:new Date(), s});
+  if (etaHistory.length > MAX_POINTS) etaHistory.shift();
+  etaChart.data.labels = etaHistory.map(h => Math.floor(h.s/60)+'m');
+  etaChart.data.datasets[0].data = etaHistory.map(h => h.s);
   etaChart.update();
 }
 
 // ── Helpers ──
-function formatTime(s){if(s<=0)return"Due";const m=Math.floor(s/60),r=s%60;return`${m}:${String(r).padStart(2,'0')}`;}
-function getChangeMarker(d){return d>0?{symbol:'↑',cls:'up'}:d<0?{symbol:'↓',cls:'down'}:{symbol:'→',cls:'same'};}
-function statusClass(v){return v===10?'dot-good':v<=3?'dot-major':'dot-minor';}
-function statusText(v){return v===10?'Good service':v<=3?'Severe disruption':'Minor delays';}
-function isDisruptionRelevant(desc,myDir){
-  if(!desc)return false;
-  const d=desc.toLowerCase(),opp=myDir==='northbound'?'southbound':'northbound';
-  if(d.includes(opp)&&!d.includes(myDir))return false;
+function formatTime(s) { if(s<=0)return"Due"; const m=Math.floor(s/60),r=s%60; return`${m}:${String(r).padStart(2,'0')}`; }
+function getChangeMarker(d) { return d>0?{symbol:'↑',cls:'up'}:d<0?{symbol:'↓',cls:'down'}:{symbol:'→',cls:'same'}; }
+function statusClass(v) { return v===10?'dot-good':v<=3?'dot-major':'dot-minor'; }
+function statusText(v)  { return v===10?'Good service':v<=3?'Severe disruption':'Minor delays'; }
+
+function isDisruptionRelevant(desc, myDir) {
+  if (!desc) return false;
+  const d = desc.toLowerCase();
+  const opp = myDir==='northbound'?'southbound':'northbound';
+  if (d.includes(opp) && !d.includes(myDir)) return false;
   return true;
 }
 
-// ── Bus card colour ──
-function updateBusCard(nextSecs,vehicleId){
-  const panel=document.getElementById('busPanel');
-  const before=vehicleId&&vehiclesStillBeforeCheckpoint.has(vehicleId);
+// ── Bus card colour (panel only, not body) ──
+function updateBusCard(nextSecs, vehicleId) {
+  const panel = document.getElementById('busPanel');
+  const before = vehicleId && vehiclesStillBeforeCheckpoint.has(vehicleId);
   panel.classList.remove('bus-red','bus-amber','bus-green','bus-yellow');
-  if(nextSecs==null||nextSecs>360)        panel.classList.add('bus-red');
-  else if(nextSecs<120)                   panel.classList.add('bus-yellow');
-  else if(before||nextSecs>=270)          panel.classList.add('bus-amber');
-  else                                    panel.classList.add('bus-green');
+  if (nextSecs == null || nextSecs > 360)   panel.classList.add('bus-red');
+  else if (nextSecs < 120)                  panel.classList.add('bus-yellow');
+  else if (before || nextSecs >= 270)       panel.classList.add('bus-amber');
+  else                                      panel.classList.add('bus-green');
 }
 
 // ── Delay banner ──
-function updateDelayBanner(){
-  const issues=[];
-  if(delayState.northern?.severity<10) issues.push({label:'Northern Line',url:delayState.northern.url});
-  if(delayState.victoria?.severity<10) issues.push({label:'Victoria Line',url:delayState.victoria.url});
-  if(delayState.rail?.severity<10)     issues.push({label:'SW Rail',      url:delayState.rail.url});
-  const banner=document.getElementById('delayBanner');
-  if(!issues.length){banner.classList.remove('visible');return;}
-  document.getElementById('bannerLines').innerHTML=issues.map(i=>
+function updateDelayBanner() {
+  const issues = [];
+  if (delayState.northern?.severity < 10) issues.push({label:'Northern Line', url:delayState.northern.url});
+  if (delayState.victoria?.severity < 10) issues.push({label:'Victoria Line', url:delayState.victoria.url});
+  if (delayState.rail?.severity < 10)     issues.push({label:'SW Rail',       url:delayState.rail.url});
+  const banner = document.getElementById('delayBanner');
+  if (!issues.length) { banner.classList.remove('visible'); return; }
+  document.getElementById('bannerLines').innerHTML = issues.map(i =>
     `<span class="banner-chip" onclick="event.stopPropagation();window.open('${i.url}','_blank')">🔴 ${i.label}</span>`
   ).join('');
   banner.classList.add('visible');
-  banner.onclick=()=>window.open(issues[0].url,'_blank');
+  banner.onclick = () => window.open(issues[0].url, '_blank');
 }
 
-// ── Bus ──
-function resetProgressBar(){
-  const b=document.getElementById('progressBar');
-  b.style.animation='none';void b.offsetWidth;b.style.animation='countdown 15s linear forwards';
+// ── Progress bar ──
+function resetProgressBar() {
+  const b = document.getElementById('progressBar');
+  b.style.animation = 'none';
+  void b.offsetWidth;
+  b.style.animation = 'countdown 15s linear forwards';
 }
-function startCountdown(){
-  if(countdownInterval)clearInterval(countdownInterval);
-  countdownInterval=setInterval(()=>{
-    currentBuses=currentBuses.map(b=>({timeToStation:Math.max(0,b.timeToStation-1),vehicleId:b.vehicleId}));
+
+// ── Countdown (ticks bus display every second) ──
+function startCountdown() {
+  if (countdownInterval) clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    currentBuses = currentBuses.map(b => ({timeToStation:Math.max(0, b.timeToStation-1), vehicleId:b.vehicleId}));
     renderBuses();
-  },1000);
+  }, 1000);
 }
-function renderBuses(busCfg){
-  busCfg=busCfg||(currentDirection==='return'?BUS_MODES[returnBusMode]:cfg());
-  const next=currentBuses.length>0?currentBuses[0].timeToStation:null;
-  document.getElementById('busDisplay').textContent=next!==null?formatTime(next):'–';
-  const plate=currentBuses.length>0&&currentBuses[0].vehicleId?currentBuses[0].vehicleId:'';
-  const pEl=document.getElementById('busPlate');pEl.textContent=plate;pEl.style.display=plate?'inline-block':'none';
-  document.getElementById('busSecondary').innerHTML=currentBuses.slice(1).map(b=>
-    `<span class="bus-chip">${formatTime(b.timeToStation)}${b.vehicleId?` · <span style="opacity:0.6;font-size:11px">${b.vehicleId}</span>`:''}</span>`
+
+// ── Render buses ──
+function renderBuses(busCfg) {
+  busCfg = busCfg || (currentDirection==='return' ? BUS_MODES[returnBusMode] : cfg());
+  const next = currentBuses.length > 0 ? currentBuses[0].timeToStation : null;
+  document.getElementById('busDisplay').textContent = next !== null ? formatTime(next) : '–';
+
+  const plate = currentBuses.length > 0 && currentBuses[0].vehicleId ? currentBuses[0].vehicleId : '';
+  const pEl = document.getElementById('busPlate');
+  pEl.textContent = plate;
+  pEl.style.display = plate ? 'inline-block' : 'none';
+
+  document.getElementById('busSecondary').innerHTML = currentBuses.slice(1).map(b =>
+    `<span class="bus-chip">${formatTime(b.timeToStation)}${b.vehicleId ? ` · <span style="opacity:0.6;font-size:11px">${b.vehicleId}</span>` : ''}</span>`
   ).join('');
-  const cm=document.getElementById('changeMarkers');
-  cm.innerHTML=changeHistory.slice(-10).map(ch=>`<span class="marker ${ch.cls}">${ch.symbol}</span>`).join('');
-  if(consecutiveNoDecrease>=8)cm.innerHTML+='<span class="warning">⚠️</span>';
-  const nv=currentBuses.length>0?currentBuses[0].vehicleId:null;
-  const before=nv&&vehiclesStillBeforeCheckpoint.has(nv);
-  document.getElementById('busFooter').textContent=
-    currentBuses.length===0?`No ${busCfg.lineName} buses right now`:
-    before?`⏳ Not yet past ${busCfg.checkpointName}`:
-    currentBuses.length===1?'✓ Past checkpoint':`✓ Past checkpoint · +${currentBuses.length-1} following`;
-  updateBusCard(next,nv);
+
+  const cm = document.getElementById('changeMarkers');
+  cm.innerHTML = changeHistory.slice(-10).map(ch => `<span class="marker ${ch.cls}">${ch.symbol}</span>`).join('');
+  if (consecutiveNoDecrease >= 8) cm.innerHTML += '<span class="warning">⚠️</span>';
+
+  const nv = currentBuses.length > 0 ? currentBuses[0].vehicleId : null;
+  const before = nv && vehiclesStillBeforeCheckpoint.has(nv);
+  document.getElementById('busFooter').textContent =
+    currentBuses.length === 0 ? `No ${busCfg.lineName} buses right now` :
+    before ? `⏳ Not yet past ${busCfg.checkpointName}` :
+    currentBuses.length === 1 ? '✓ Past checkpoint' :
+    `✓ Past checkpoint · +${currentBuses.length-1} following`;
+
+  updateBusCard(next, nv);
 }
-async function loadBus(){
+
+// ── Load bus ──
+async function loadBus() {
   resetProgressBar();
-  document.getElementById('busError').textContent='';
-  const busCfg=currentDirection==='return'?BUS_MODES[returnBusMode]:cfg();
-  try{
-    const r=await fetch(`https://api.tfl.gov.uk/StopPoint/${busCfg.busStop}/Arrivals`);
-    if(!r.ok)throw new Error(`HTTP ${r.status}`);
-    const data=await r.json();
-    const buses=data.filter(b=>b.lineName===busCfg.lineName).sort((a,b)=>a.timeToStation-b.timeToStation).slice(0,3);
-    if(cfg().showOtherBuses&&returnBusMode==='413')
-      renderOtherBuses(data.filter(b=>b.lineName!=='413').sort((a,b)=>a.timeToStation-b.timeToStation).slice(0,6));
-    document.getElementById('otherBusesPanel').style.display=(cfg().showOtherBuses&&returnBusMode==='413')?'block':'none';
-    if(buses.length>0&&previousTimes.length>0){
-      const delta=buses[0].timeToStation-previousTimes[0];
+  document.getElementById('busError').textContent = '';
+  const busCfg = currentDirection==='return' ? BUS_MODES[returnBusMode] : cfg();
+  try {
+    const r = await fetch(`https://api.tfl.gov.uk/StopPoint/${busCfg.busStop}/Arrivals`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+
+    const buses = data.filter(b => b.lineName === busCfg.lineName)
+      .sort((a,b) => a.timeToStation - b.timeToStation).slice(0,3);
+
+    if (cfg().showOtherBuses && returnBusMode === '413')
+      renderOtherBuses(data.filter(b => b.lineName !== '413').sort((a,b) => a.timeToStation - b.timeToStation).slice(0,6));
+    document.getElementById('otherBusesPanel').style.display =
+      (cfg().showOtherBuses && returnBusMode === '413') ? 'block' : 'none';
+
+    if (buses.length > 0 && previousTimes.length > 0) {
+      const delta = buses[0].timeToStation - previousTimes[0];
       changeHistory.push(getChangeMarker(delta));
-      if(changeHistory.length>10)changeHistory.shift();
-      consecutiveNoDecrease=delta>0?consecutiveNoDecrease+1:0;
-    }else{changeHistory=[];consecutiveNoDecrease=0;}
-    previousTimes=buses.map(b=>b.timeToStation);
-    currentBuses=buses.map(b=>({timeToStation:b.timeToStation,vehicleId:b.vehicleId}));
-    renderBuses(busCfg);updateChart(buses.length>0?buses[0].timeToStation:null);startCountdown();
-    if(busCfg.checkpoint){
-      try{
-        const rc=await fetch(`https://api.tfl.gov.uk/StopPoint/${busCfg.checkpoint}/Arrivals`);
-        if(rc.ok) vehiclesStillBeforeCheckpoint=new Set((await rc.json()).filter(b=>b.lineName===busCfg.lineName).map(b=>b.vehicleId));
-      }catch(e){vehiclesStillBeforeCheckpoint=new Set();}
-    }else{vehiclesStillBeforeCheckpoint=new Set();}
+      if (changeHistory.length > 10) changeHistory.shift();
+      consecutiveNoDecrease = delta > 0 ? consecutiveNoDecrease + 1 : 0;
+    } else { changeHistory = []; consecutiveNoDecrease = 0; }
+
+    previousTimes = buses.map(b => b.timeToStation);
+    currentBuses  = buses.map(b => ({timeToStation:b.timeToStation, vehicleId:b.vehicleId}));
     renderBuses(busCfg);
-  }catch(err){document.getElementById('busError').textContent=`Bus error: ${err.message}`;}
+    updateChart(buses.length > 0 ? buses[0].timeToStation : null);
+    startCountdown();
+
+    // Checkpoint
+    if (busCfg.checkpoint) {
+      try {
+        const rc = await fetch(`https://api.tfl.gov.uk/StopPoint/${busCfg.checkpoint}/Arrivals`);
+        if (rc.ok)
+          vehiclesStillBeforeCheckpoint = new Set(
+            (await rc.json()).filter(b => b.lineName === busCfg.lineName).map(b => b.vehicleId)
+          );
+      } catch(e) { vehiclesStillBeforeCheckpoint = new Set(); }
+    } else { vehiclesStillBeforeCheckpoint = new Set(); }
+    renderBuses(busCfg);
+  } catch(err) {
+    document.getElementById('busError').textContent = `Bus error: ${err.message}`;
+  }
 }
-function renderOtherBuses(buses){
-  const el=document.getElementById('otherBusesList');if(!el)return;
-  if(!buses.length){el.textContent='No other buses right now';return;}
-  el.innerHTML=buses.map(b=>{
-    const m=Math.floor(b.timeToStation/60),s=b.timeToStation%60;
-    return`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+
+function renderOtherBuses(buses) {
+  const el = document.getElementById('otherBusesList'); if (!el) return;
+  if (!buses.length) { el.textContent = 'No other buses right now'; return; }
+  el.innerHTML = buses.map(b => {
+    const m = Math.floor(b.timeToStation/60), s = b.timeToStation%60;
+    return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
       <span><strong style="font-size:15px">${b.lineName}</strong> <span style="color:#888;font-size:12px">→ ${b.destinationName}</span></span>
       <span style="font-family:'DM Mono',monospace;font-size:13px">${m>0?m+'m ':''} ${s}s</span></div>`;
   }).join('');
 }
 
-// ── Rail ──
-function renderLineStatus(statusId,descId,severity,desc,cardId,serviceKey,serviceUrl){
-  const el=document.getElementById(statusId),dc=document.getElementById(descId),card=cardId?document.getElementById(cardId):null;
-  if(!el)return;
-  el.innerHTML=`<span class="dot ${statusClass(severity)}"></span>${statusText(severity)}`;
-  if(dc)dc.textContent=desc||'';
-  if(card)card.classList.toggle('card-delay',severity<10);
-  if(serviceKey){delayState[serviceKey]={severity,url:serviceUrl||cfg().journeyCheck};updateDelayBanner();}
+// ── Render line status ──
+function renderLineStatus(statusId, descId, severity, desc, cardId, serviceKey, serviceUrl) {
+  const el = document.getElementById(statusId), dc = document.getElementById(descId), card = cardId ? document.getElementById(cardId) : null;
+  if (!el) return;
+  el.innerHTML = `<span class="dot ${statusClass(severity)}"></span>${statusText(severity)}`;
+  if (dc) dc.textContent = desc || '';
+  if (card) card.classList.toggle('card-delay', severity < 10);
+  if (serviceKey) { delayState[serviceKey] = {severity, url:serviceUrl||cfg().journeyCheck}; updateDelayBanner(); }
 }
-function renderRailUnknown(){
-  const el=document.getElementById('railStatus'),dc=document.getElementById('railDesc'),card=document.getElementById('railCard');
-  if(el)el.innerHTML=`<span class="dot dot-minor"></span>Tap to check`;
-  if(dc)dc.textContent='Tap for live trains';
-  if(card){card.classList.remove('card-delay');card.href=getRailCfg().journeyCheck;}
-  delayState.rail=null;updateDelayBanner();
+
+// ── Rail: manual refresh only (preserves API quota) ──
+function renderRailUnknown() {
+  const el = document.getElementById('railStatus'), dc = document.getElementById('railDesc'), card = document.getElementById('railCard');
+  if (el) el.innerHTML = `<span class="dot dot-minor"></span>Tap to check`;
+  if (dc) dc.textContent = 'Tap for live trains';
+  if (card) { card.classList.remove('card-delay'); card.href = getRailCfg().journeyCheck; }
+  delayState.rail = null; updateDelayBanner();
 }
-async function loadRailFromTransportAPI(){
-  const{railFrom,railTo,journeyCheck}=getRailCfg();
-  const url=`https://transportapi.com/v3/uk/train/station/${railFrom}/live.json?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=${railTo}&train_status=passenger&type=departure`;
-  const r=await fetch(url);
-  if(r.status===429||r.status===403)throw new Error('429');
-  if(!r.ok)throw new Error('API '+r.status);
-  const data=await r.json();
-  const svcs=(data.departures?.all||[]).filter(s=>s.operator==='SW');
-  if(!svcs.length){renderLineStatus('railStatus','railDesc',10,'No SWR departures found','railCard','rail',journeyCheck);return;}
-  const nx=svcs[0],status=nx.status,aimed=nx.aimed_departure_time,expected=nx.expected_departure_time,mins=nx.best_departure_estimate_mins;
-  let severity,desc;
-  if(status==='CANCELLED'){severity=1;desc=`${aimed} CANCELLED`;}
-  else if(status==='LATE'){
-    const toM=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
-    const delay=expected?toM(expected)-toM(aimed):'?';
-    severity=delay>=10?3:6;desc=`${aimed} — ${delay} min late${mins!=null?` · ${mins} min`:''}`;
-  }else if(status==='EARLY'){severity=10;desc=`${aimed} — early · ${mins} min`;}
-  else{severity=10;desc=`${aimed} — on time${mins!=null?` · ${mins} min`:'`}`;}
+
+async function loadRailFromTransportAPI() {
+  const {railFrom, railTo, journeyCheck} = getRailCfg();
+  const url = `https://transportapi.com/v3/uk/train/station/${railFrom}/live.json?app_id=${TAPI_ID}&app_key=${TAPI_KEY}&calling_at=${railTo}&train_status=passenger&type=departure`;
+  const r = await fetch(url);
+  if (r.status === 429 || r.status === 403) throw new Error('429');
+  if (!r.ok) throw new Error('API ' + r.status);
+  const data = await r.json();
+  const svcs = (data.departures?.all || []).filter(s => s.operator === 'SW');
+  if (!svcs.length) { renderLineStatus('railStatus','railDesc',10,'No SWR departures found','railCard','rail',journeyCheck); return; }
+  const nx = svcs[0], status=nx.status, aimed=nx.aimed_departure_time, expected=nx.expected_departure_time, mins=nx.best_departure_estimate_mins;
+  let severity, desc;
+  if (status === 'CANCELLED') { severity=1; desc=`${aimed} CANCELLED`; }
+  else if (status === 'LATE') {
+    const toM = t => { const [h,m]=t.split(':').map(Number); return h*60+m; };
+    const delay = expected ? toM(expected)-toM(aimed) : '?';
+    severity = delay>=10?3:6;
+    desc = `${aimed} — ${delay} min late${mins!=null?` · ${mins} min`:''}`;
+  } else if (status === 'EARLY') {
+    severity=10; desc=`${aimed} — early · ${mins} min`;
+  } else {
+    severity=10; desc=`${aimed} — on time${mins!=null?` · ${mins} min`:''}`;
+  }
   renderLineStatus('railStatus','railDesc',severity,desc,'railCard','rail',journeyCheck);
-  document.getElementById('railCard').href=journeyCheck;
-  document.getElementById('railUpdated').textContent='Rail: '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('railCard').href = journeyCheck;
+  document.getElementById('railUpdated').textContent = 'Rail: ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 }
-async function refreshRail(){
-  document.getElementById('railStatus').innerHTML='<span class="dot dot-minor"></span>Checking…';
-  document.getElementById('railDesc').textContent='';
-  if(TAPI_ID&&TAPI_KEY){
-    try{await loadRailFromTransportAPI();}
-    catch(err){
-      if(err.message.includes('429')){
+
+// refreshRail — called once on load, and by the ↺ button on the rail card only
+async function refreshRail() {
+  document.getElementById('railStatus').innerHTML = '<span class="dot dot-minor"></span>Checking…';
+  document.getElementById('railDesc').textContent = '';
+  if (TAPI_ID && TAPI_KEY) {
+    try { await loadRailFromTransportAPI(); }
+    catch(err) {
+      if (err.message.includes('429')) {
         renderLineStatus('railStatus','railDesc',5,'⚠️ Daily quota reached — tap for trains','railCard','rail',getRailCfg().journeyCheck);
-        document.getElementById('railCard').href='https://www.nationalrail.co.uk/live-trains/departures/raynes-park/london-waterloo/';
-      }else{renderRailUnknown();}
+        document.getElementById('railCard').href = 'https://www.nationalrail.co.uk/live-trains/departures/raynes-park/london-waterloo/';
+      } else { renderRailUnknown(); }
     }
-  }else{renderRailUnknown();}
+  } else { renderRailUnknown(); }
 }
-async function loadTubeAndRail(){
-  try{
-    const r=await fetch(TUBE_LINES_URL);if(!r.ok)throw new Error();
-    const lines=await r.json();
-    const northern=lines.find(l=>l.id==='northern');
-    if(northern?.lineStatuses?.length){
-      const s=northern.lineStatuses[0],fd=s.disruption?.description||'',myDir=cfg().northernDirection;
-      const relevant=s.statusSeverity===10||isDisruptionRelevant(fd,myDir);
-      const severity=relevant?s.statusSeverity:10;
-      const short=fd.length>80?fd.slice(0,80)+'…':fd;
-      renderLineStatus('northernStatus','northernDesc',severity,
-        relevant?short:`(${myDir==='northbound'?'Southbound':'Northbound'} only)`,
+
+// ── Tube only — no rail inside here ──
+async function loadTubeAndRail() {
+  try {
+    const r = await fetch(TUBE_LINES_URL); if (!r.ok) throw new Error();
+    const lines = await r.json();
+
+    const northern = lines.find(l => l.id === 'northern');
+    if (northern?.lineStatuses?.length) {
+      const s = northern.lineStatuses[0], fd = s.disruption?.description||'', myDir = cfg().northernDirection;
+      const relevant = s.statusSeverity===10 || isDisruptionRelevant(fd, myDir);
+      const severity = relevant ? s.statusSeverity : 10;
+      const short = fd.length>80 ? fd.slice(0,80)+'…' : fd;
+      renderLineStatus('northernStatus','northernDesc', severity,
+        relevant ? short : `(${myDir==='northbound'?'Southbound':'Northbound'} only)`,
         'northernCard','northern','https://tfl.gov.uk/tube/line/northern/status');
     }
-    const victoria=lines.find(l=>l.id==='victoria');
-    if(victoria?.lineStatuses?.length){
-      const s=victoria.lineStatuses[0],fd=s.disruption?.description||'',myDir=cfg().victoriaDirection;
-      const relevant=s.statusSeverity===10||isDisruptionRelevant(fd,myDir);
-      const severity=relevant?s.statusSeverity:10;
-      const short=fd.length>80?fd.slice(0,80)+'…':fd;
-      renderLineStatus('victoriaStatus','victoriaDesc',severity,
-        relevant?short:`(${myDir==='northbound'?'Southbound':'Northbound'} only)`,
+
+    const victoria = lines.find(l => l.id === 'victoria');
+    if (victoria?.lineStatuses?.length) {
+      const s = victoria.lineStatuses[0], fd = s.disruption?.description||'', myDir = cfg().victoriaDirection;
+      const relevant = s.statusSeverity===10 || isDisruptionRelevant(fd, myDir);
+      const severity = relevant ? s.statusSeverity : 10;
+      const short = fd.length>80 ? fd.slice(0,80)+'…' : fd;
+      renderLineStatus('victoriaStatus','victoriaDesc', severity,
+        relevant ? short : `(${myDir==='northbound'?'Southbound':'Northbound'} only)`,
         'victoriaCard','victoria','https://tfl.gov.uk/tube/line/victoria/status');
     }
-    if(allLinesVisible)renderAllLines(lines);
-    window._allTubeLines=lines;
-    document.getElementById('railUpdated').textContent='Tube: '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  }catch(err){
-    ['northernStatus','victoriaStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=`<span class="dot dot-minor"></span>Unavailable`;});
+
+    if (allLinesVisible) renderAllLines(lines);
+    window._allTubeLines = lines;
+    document.getElementById('railUpdated').textContent = 'Tube: ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  } catch(err) {
+    ['northernStatus','victoriaStatus'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.innerHTML = `<span class="dot dot-minor"></span>Unavailable`;
+    });
   }
-  // Rail NOT refreshed here — manual only
+  // Rail is NOT touched here — manual only
 }
-function renderAllLines(lines){
-  const grid=document.getElementById('linesGrid');
-  if(!lines?.length){grid.textContent='No data';return;}
-  grid.innerHTML=lines.map(l=>{
-    const c=TUBE_COLOURS[l.id]||'#888',sev=l.lineStatuses?.[0]?.statusSeverity??10;
-    return`<div class="line-row"><div class="line-pill" style="background:${c};border:1px solid rgba(255,255,255,0.15)"></div><div class="line-name">${l.name}</div><span class="dot ${statusClass(sev)}" style="margin:0"></span></div>`;
+
+function renderAllLines(lines) {
+  const grid = document.getElementById('linesGrid');
+  if (!lines?.length) { grid.textContent='No data'; return; }
+  grid.innerHTML = lines.map(l => {
+    const c = TUBE_COLOURS[l.id]||'#888', sev = l.lineStatuses?.[0]?.statusSeverity??10;
+    return `<div class="line-row"><div class="line-pill" style="background:${c};border:1px solid rgba(255,255,255,0.15)"></div><div class="line-name">${l.name}</div><span class="dot ${statusClass(sev)}" style="margin:0"></span></div>`;
   }).join('');
 }
 
 // ── Rail station toggle ──
-function setRailStation(code){
-  returnRailStation=code;
-  ['VXH','WAT'].forEach(c=>{
-    const b=document.getElementById('railToggle'+c);
-    b.style.background=c===code?'rgba(255,255,255,0.18)':'transparent';
-    b.style.color=c===code?'#fff':'#888';
-    b.style.borderColor=c===code?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.1)';
+function setRailStation(code) {
+  returnRailStation = code;
+  ['VXH','WAT'].forEach(c => {
+    const b = document.getElementById('railToggle'+c);
+    b.style.background   = c===code ? 'rgba(255,255,255,0.18)' : 'transparent';
+    b.style.color        = c===code ? '#fff' : '#888';
+    b.style.borderColor  = c===code ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)';
   });
-  const rc=getRailCfg();
-  document.getElementById('railCardName').textContent=rc.railName;
-  document.getElementById('railCard').href=rc.journeyCheck;
-  delayState.rail=null;updateDelayBanner();
+  const rc = getRailCfg();
+  document.getElementById('railCardName').textContent = rc.railName;
+  document.getElementById('railCard').href = rc.journeyCheck;
+  delayState.rail = null; updateDelayBanner();
   refreshRail();
 }
 
 // ── Bus mode toggle ──
-function setBusMode(mode){
-  returnBusMode=mode;
-  const bm=BUS_MODES[mode];
-  document.getElementById('busLabel').textContent=bm.label;
-  ['413','163'].forEach(m=>{
-    const b=document.getElementById('busToggle'+m);
-    b.style.background=m===mode?'rgba(255,255,255,0.18)':'transparent';
-    b.style.color=m===mode?'#fff':'#888';
-    b.style.borderColor=m===mode?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.1)';
+function setBusMode(mode) {
+  returnBusMode = mode;
+  const bm = BUS_MODES[mode];
+  document.getElementById('busLabel').textContent = bm.label;
+  ['413','163'].forEach(m => {
+    const b = document.getElementById('busToggle'+m);
+    b.style.background  = m===mode ? 'rgba(255,255,255,0.18)' : 'transparent';
+    b.style.color       = m===mode ? '#fff' : '#888';
+    b.style.borderColor = m===mode ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)';
   });
-  currentBuses=[];previousTimes=[];changeHistory=[];consecutiveNoDecrease=0;
-  vehiclesStillBeforeCheckpoint=new Set();
+  currentBuses=[]; previousTimes=[]; changeHistory=[]; consecutiveNoDecrease=0;
+  vehiclesStillBeforeCheckpoint = new Set();
   loadBus();
 }
 
 // ── Direction switch ──
-function switchDirection(){
-  currentDirection=currentDirection==='outbound'?'return':'outbound';
-  const isReturn=currentDirection==='return',c=cfg();
-  returnRailStation='VXH';returnBusMode='413';
-  document.getElementById('pageTitle').textContent=c.title;
-  document.getElementById('pageSubtitle').textContent=c.subtitle;
-  document.getElementById('directionBtn').title=isReturn?'Switch to Outbound':'Switch to Return';
-  document.getElementById('railStationToggle').style.display=isReturn?'flex':'none';
-  document.getElementById('busModeToggle').style.display=isReturn?'flex':'none';
-  if(isReturn){setRailStation('VXH');setBusMode('413');}
-  else{
-    document.getElementById('busLabel').textContent=c.busLabel;
-    document.getElementById('railCardName').textContent=c.railName;
-    document.getElementById('railCard').href=c.journeyCheck;
+function switchDirection() {
+  currentDirection = currentDirection==='outbound' ? 'return' : 'outbound';
+  const isReturn = currentDirection==='return', c = cfg();
+  returnRailStation='VXH'; returnBusMode='413';
+  document.getElementById('pageTitle').textContent    = c.title;
+  document.getElementById('pageSubtitle').textContent = c.subtitle;
+  document.getElementById('directionBtn').title = isReturn ? 'Switch to Outbound' : 'Switch to Return';
+  document.getElementById('railStationToggle').style.display = isReturn ? 'flex' : 'none';
+  document.getElementById('busModeToggle').style.display     = isReturn ? 'flex' : 'none';
+  if (isReturn) { setRailStation('VXH'); setBusMode('413'); }
+  else {
+    document.getElementById('busLabel').textContent     = c.busLabel;
+    document.getElementById('railCardName').textContent = c.railName;
+    document.getElementById('railCard').href            = c.journeyCheck;
   }
-  currentBuses=[];previousTimes=[];changeHistory=[];consecutiveNoDecrease=0;
-  vehiclesStillBeforeCheckpoint=new Set();
-  delayState.rail=null;delayState.northern=null;delayState.victoria=null;updateDelayBanner();
-  ['railStatus','northernStatus','victoriaStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<span class="dot dot-minor"></span>Checking…';});
-  ['railDesc','northernDesc','victoriaDesc'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
-  loadBus();loadTubeAndRail();refreshRail();
+  currentBuses=[]; previousTimes=[]; changeHistory=[]; consecutiveNoDecrease=0;
+  vehiclesStillBeforeCheckpoint = new Set();
+  delayState.rail=null; delayState.northern=null; delayState.victoria=null; updateDelayBanner();
+  ['railStatus','northernStatus','victoriaStatus'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML='<span class="dot dot-minor"></span>Checking…';
+  });
+  ['railDesc','northernDesc','victoriaDesc'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent='';
+  });
+  loadBus(); loadTubeAndRail(); refreshRail();
 }
 
 // ── UI toggles ──
-document.getElementById('toggleGraphBtn').addEventListener('click',()=>{
-  graphVisible=!graphVisible;
-  document.getElementById('graphContainer').classList.toggle('hidden',!graphVisible);
-  document.getElementById('toggleGraphBtn').textContent=graphVisible?'📉':'📊';
+document.getElementById('toggleGraphBtn').addEventListener('click', () => {
+  graphVisible = !graphVisible;
+  document.getElementById('graphContainer').classList.toggle('hidden', !graphVisible);
+  document.getElementById('toggleGraphBtn').textContent = graphVisible ? '📉' : '📊';
 });
-document.getElementById('toggleLinesBtn').addEventListener('click',()=>{
-  allLinesVisible=!allLinesVisible;
-  document.getElementById('allLinesPanel').classList.toggle('visible',allLinesVisible);
-  document.getElementById('toggleLinesBtn').textContent=allLinesVisible?'🗺':'🗺️';
-  if(allLinesVisible&&window._allTubeLines)renderAllLines(window._allTubeLines);
-  else if(allLinesVisible)loadTubeAndRail();
+document.getElementById('toggleLinesBtn').addEventListener('click', () => {
+  allLinesVisible = !allLinesVisible;
+  document.getElementById('allLinesPanel').classList.toggle('visible', allLinesVisible);
+  document.getElementById('toggleLinesBtn').textContent = allLinesVisible ? '🗺' : '🗺️';
+  if (allLinesVisible && window._allTubeLines) renderAllLines(window._allTubeLines);
+  else if (allLinesVisible) loadTubeAndRail();
 });
-document.getElementById('directionBtn').addEventListener('click',switchDirection);
-document.getElementById('refreshBtn').addEventListener('click',()=>{loadBus();loadTubeAndRail();});
+document.getElementById('directionBtn').addEventListener('click', switchDirection);
+document.getElementById('refreshBtn').addEventListener('click', () => { loadBus(); loadTubeAndRail(); });
 
-async function requestWakeLock(){try{if('wakeLock' in navigator)await navigator.wakeLock.request('screen');}catch(e){}}
+async function requestWakeLock() {
+  try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch(e) {}
+}
 
 // ── Init ──
 initChart();
-document.getElementById('pageTitle').textContent=cfg().title;
-document.getElementById('pageSubtitle').textContent=cfg().subtitle;
-document.getElementById('busLabel').textContent=cfg().busLabel;
-document.getElementById('railCardName').textContent=cfg().railName;
-document.getElementById('railStationToggle').style.display='none';
-document.getElementById('busModeToggle').style.display='none';
+document.getElementById('pageTitle').textContent    = cfg().title;
+document.getElementById('pageSubtitle').textContent = cfg().subtitle;
+document.getElementById('busLabel').textContent     = cfg().busLabel;
+document.getElementById('railCardName').textContent = cfg().railName;
+document.getElementById('railStationToggle').style.display = 'none';
+document.getElementById('busModeToggle').style.display     = 'none';
 
 loadBus();
 loadTubeAndRail();
-refreshRail(); // once on load only
+refreshRail();  // once on load only — no interval
 
-setInterval(loadBus,15000);
-setInterval(loadTubeAndRail,60000); // tube only, no rail interval
+setInterval(loadBus, 15000);          // bus: every 15s
+setInterval(loadTubeAndRail, 60000);  // tube only: every 60s — rail NOT included
 
 requestWakeLock();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)requestWakeLock();});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) requestWakeLock(); });
 </script>
 </body>
 </html>
