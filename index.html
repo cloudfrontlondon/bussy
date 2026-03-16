@@ -150,6 +150,14 @@
   .progress-bar { height: 100%; width: 100%; background: rgba(255,255,255,0.5); transform-origin: left; animation: countdown 15s linear forwards; }
   @keyframes countdown { from{transform:scaleX(1)} to{transform:scaleX(0)} }
 
+  /* ── Wake lock indicator ── */
+  #wakeLockIndicator {
+    position: fixed; bottom: 6px; right: 10px;
+    font-size: 9px; color: rgba(255,255,255,0.2);
+    font-family: 'DM Mono', monospace; letter-spacing: 1px;
+    z-index: 20; pointer-events: none;
+  }
+
   /* ── Portrait: stacked ── */
   #mainLayout { display: block; }
 
@@ -172,7 +180,6 @@
     #transitCol   { grid-column: 2; grid-row: 1; }
     #belowLayout  { grid-column: 1 / -1; grid-row: 2; }
 
-    /* Big centred timer */
     #busPanel {
       display: flex; flex-direction: column;
       justify-content: center; align-items: center;
@@ -184,7 +191,6 @@
     #busPanel .change-markers { justify-content: center; }
     #busPanel > div:first-child { width: 100%; }
 
-    /* Right column: stacked cards, compact */
     #transitCol { display: flex; flex-direction: column; gap: 8px; }
     #transitCol .transit-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 0; }
     #transitCol .transit-card { padding: 10px; }
@@ -199,6 +205,11 @@
 </head>
 
 <body>
+
+<!-- Silent video loop — invisible, keeps screen awake on iOS as fallback -->
+<video id="noSleepVideo" muted loop playsinline
+  style="position:absolute;width:1px;height:1px;opacity:0.01;pointer-events:none;top:0;left:0">
+</video>
 
 <header>
   <div class="title-block">
@@ -223,7 +234,6 @@
 
 <div id="mainLayout">
 
-  <!-- 75% left — bus -->
   <div id="busPanelCol">
     <div id="busPanel">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;width:100%">
@@ -244,7 +254,6 @@
     </div>
   </div>
 
-  <!-- 25% right — tube + rail -->
   <div id="transitCol">
     <div class="transit-grid">
       <a class="transit-card" id="northernCard" style="border-top-color:#888;"
@@ -285,7 +294,6 @@
     </div>
   </div>
 
-  <!-- Full-width below in both portrait and landscape -->
   <div id="belowLayout">
     <div id="otherBusesPanel" style="display:none;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;">
       <div class="section-label">🚌 Other buses · Morden Civic Centre</div>
@@ -301,8 +309,14 @@
 
 <div id="graphContainer"><canvas id="etaChart"></canvas></div>
 <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+<div id="wakeLockIndicator">☀ AWAKE</div>
 
 <script>
+// ── Time-based default direction ──
+// Before noon → outbound (Elm Walk → London); noon or after → return (London → Elm Walk)
+const hour = new Date().getHours();
+let currentDirection = hour < 12 ? 'outbound' : 'return';
+
 // ── Direction config ──
 const DIRECTIONS = {
   outbound: {
@@ -340,7 +354,6 @@ const TUBE_COLOURS = {
   'overground':'#EE7C0E','dlr':'#00A4A7',
 };
 
-let currentDirection = 'outbound';
 let returnRailStation = 'VXH';
 let returnBusMode = '413';
 
@@ -364,6 +377,110 @@ let etaHistory = [], etaChart, countdownInterval = null;
 let currentBuses = [], previousTimes = [], changeHistory = [], consecutiveNoDecrease = 0;
 let graphVisible = true, allLinesVisible = false;
 const MAX_POINTS = 20;
+let busCardState = null; // tracks current colour state to detect transitions
+
+// ══════════════════════════════════════════════
+// ── Audio alerts — Web Audio API ──
+// green = "time to go" → bright rising two-tone chime
+// yellow = "leave NOW" → urgent triple beep
+// ══════════════════════════════════════════════
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // Resume if suspended (required after user gesture on iOS)
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playGreenChime() {
+  // Warm two-note rising chime: C5 → E5, pleasant "go" signal
+  try {
+    const ctx = getAudioCtx(), now = ctx.currentTime;
+    [[523.25, 0, 0.18], [659.25, 0.2, 0.28]].forEach(([freq, delay, dur]) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + delay);
+      gain.gain.linearRampToValueAtTime(0.35, now + delay + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + dur);
+      osc.start(now + delay); osc.stop(now + delay + dur + 0.05);
+    });
+  } catch(e) {}
+}
+
+function playYellowUrgent() {
+  // Three quick sharp beeps — "hurry up!"
+  try {
+    const ctx = getAudioCtx(), now = ctx.currentTime;
+    [0, 0.18, 0.36].forEach(delay => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'square'; osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0, now + delay);
+      gain.gain.linearRampToValueAtTime(0.25, now + delay + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.12);
+      osc.start(now + delay); osc.stop(now + delay + 0.14);
+    });
+  } catch(e) {}
+}
+
+// Unlock audio context on first user interaction (required by iOS)
+function unlockAudio() {
+  try { getAudioCtx(); } catch(e) {}
+}
+
+// ══════════════════════════════════════════════
+// ── Wake Lock — dual strategy ──
+// 1. Screen Wake Lock API (Chrome/Android, Safari 16.4+)
+// 2. Silent video loop fallback (reliable on iOS Safari)
+// ══════════════════════════════════════════════
+let wakeLockSentinel = null;
+
+function buildNoSleepVideo() {
+  // Tiny 1×1 transparent MP4 encoded as a data URI — plays silently, keeps screen on
+  // This is the same technique used by NoSleep.js
+  const video = document.getElementById('noSleepVideo');
+  // A minimal valid MP4 (1 frame, 1×1, silent) as base64
+  const mp4 = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAA0ZtZGF0AAACrQYF//+p3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE0MiByMjQ3OSBkZDc5YTYxIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNCAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTEgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAAmWWIhAAz//727L4FNf2f0JcRLMXaSnA+KqSAgHc0wAAAAwAAAwAAFgn0I7DkqgAAAwAAAwAAAwAAIKAAFBAQgAABwABgAIIAAACwEGf/xBf/EF/8QX/xBf/EF/8QX/xBf/EF/8QX/xBf/EF/8QX/xBf/EJQAAADAABAAABAAABAAABAAABAAABAAABAAABAAABAAABAAABAAABAAABAAABAAABAAABAAABAAAB';
+  video.src = mp4;
+}
+
+async function enableWakeLock() {
+  // Strategy 1: Wake Lock API
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLockSentinel = await navigator.wakeLock.request('screen');
+      wakeLockSentinel.addEventListener('release', () => {
+        // Re-acquire if we're still visible
+        if (!document.hidden) enableWakeLock();
+      });
+      document.getElementById('wakeLockIndicator').textContent = '☀ AWAKE';
+      return;
+    } catch(e) { /* fall through to video */ }
+  }
+  // Strategy 2: silent video loop (iOS Safari fallback)
+  try {
+    const video = document.getElementById('noSleepVideo');
+    buildNoSleepVideo();
+    await video.play();
+    document.getElementById('wakeLockIndicator').textContent = '☀ AWAKE';
+  } catch(e) {
+    document.getElementById('wakeLockIndicator').textContent = '';
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLockSentinel) { wakeLockSentinel.release(); wakeLockSentinel = null; }
+  const video = document.getElementById('noSleepVideo');
+  video.pause(); video.src = '';
+}
+
+// Re-acquire when tab becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) enableWakeLock();
+  else releaseWakeLock();
+});
 
 // ── Chart ──
 function initChart() {
@@ -402,18 +519,27 @@ function isDisruptionRelevant(desc, myDir) {
   return true;
 }
 
-// ── Bus card colour (panel only, not body) ──
 function updateBusCard(nextSecs, vehicleId) {
   const panel = document.getElementById('busPanel');
   const before = vehicleId && vehiclesStillBeforeCheckpoint.has(vehicleId);
   panel.classList.remove('bus-red','bus-amber','bus-green','bus-yellow');
-  if (nextSecs == null || nextSecs > 360)   panel.classList.add('bus-red');
-  else if (nextSecs < 120)                  panel.classList.add('bus-yellow');
-  else if (before || nextSecs >= 270)       panel.classList.add('bus-amber');
-  else                                      panel.classList.add('bus-green');
+
+  let newState;
+  if (nextSecs == null || nextSecs > 360)   newState = 'red';
+  else if (nextSecs < 120)                  newState = 'yellow';
+  else if (before || nextSecs >= 270)       newState = 'amber';
+  else                                      newState = 'green';
+
+  panel.classList.add('bus-' + newState);
+
+  // Fire audio alert only on transition INTO green or yellow (not on every tick)
+  if (newState !== busCardState) {
+    if (newState === 'green')  playGreenChime();
+    if (newState === 'yellow') playYellowUrgent();
+    busCardState = newState;
+  }
 }
 
-// ── Delay banner ──
 function updateDelayBanner() {
   const issues = [];
   if (delayState.northern?.severity < 10) issues.push({label:'Northern Line', url:delayState.northern.url});
@@ -428,7 +554,6 @@ function updateDelayBanner() {
   banner.onclick = () => window.open(issues[0].url, '_blank');
 }
 
-// ── Progress bar ──
 function resetProgressBar() {
   const b = document.getElementById('progressBar');
   b.style.animation = 'none';
@@ -436,7 +561,6 @@ function resetProgressBar() {
   b.style.animation = 'countdown 15s linear forwards';
 }
 
-// ── Countdown (ticks bus display every second) ──
 function startCountdown() {
   if (countdownInterval) clearInterval(countdownInterval);
   countdownInterval = setInterval(() => {
@@ -445,7 +569,6 @@ function startCountdown() {
   }, 1000);
 }
 
-// ── Render buses ──
 function renderBuses(busCfg) {
   busCfg = busCfg || (currentDirection==='return' ? BUS_MODES[returnBusMode] : cfg());
   const next = currentBuses.length > 0 ? currentBuses[0].timeToStation : null;
@@ -475,7 +598,6 @@ function renderBuses(busCfg) {
   updateBusCard(next, nv);
 }
 
-// ── Load bus ──
 async function loadBus() {
   resetProgressBar();
   document.getElementById('busError').textContent = '';
@@ -506,7 +628,6 @@ async function loadBus() {
     updateChart(buses.length > 0 ? buses[0].timeToStation : null);
     startCountdown();
 
-    // Checkpoint
     if (busCfg.checkpoint) {
       try {
         const rc = await fetch(`https://api.tfl.gov.uk/StopPoint/${busCfg.checkpoint}/Arrivals`);
@@ -533,7 +654,6 @@ function renderOtherBuses(buses) {
   }).join('');
 }
 
-// ── Render line status ──
 function renderLineStatus(statusId, descId, severity, desc, cardId, serviceKey, serviceUrl) {
   const el = document.getElementById(statusId), dc = document.getElementById(descId), card = cardId ? document.getElementById(cardId) : null;
   if (!el) return;
@@ -543,7 +663,6 @@ function renderLineStatus(statusId, descId, severity, desc, cardId, serviceKey, 
   if (serviceKey) { delayState[serviceKey] = {severity, url:serviceUrl||cfg().journeyCheck}; updateDelayBanner(); }
 }
 
-// ── Rail: manual refresh only (preserves API quota) ──
 function renderRailUnknown() {
   const el = document.getElementById('railStatus'), dc = document.getElementById('railDesc'), card = document.getElementById('railCard');
   if (el) el.innerHTML = `<span class="dot dot-minor"></span>Tap to check`;
@@ -579,7 +698,6 @@ async function loadRailFromTransportAPI() {
   document.getElementById('railUpdated').textContent = 'Rail: ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 }
 
-// refreshRail — called once on load, and by the ↺ button on the rail card only
 async function refreshRail() {
   document.getElementById('railStatus').innerHTML = '<span class="dot dot-minor"></span>Checking…';
   document.getElementById('railDesc').textContent = '';
@@ -594,7 +712,6 @@ async function refreshRail() {
   } else { renderRailUnknown(); }
 }
 
-// ── Tube only — no rail inside here ──
 async function loadTubeAndRail() {
   try {
     const r = await fetch(TUBE_LINES_URL); if (!r.ok) throw new Error();
@@ -608,7 +725,7 @@ async function loadTubeAndRail() {
       const short = fd.length>80 ? fd.slice(0,80)+'…' : fd;
       renderLineStatus('northernStatus','northernDesc', severity,
         relevant ? short : `(${myDir==='northbound'?'Southbound':'Northbound'} only)`,
-        'northernCard','northern','https://tfl.gov.uk/tube/line/northern/status');
+        'northernCard','northern','https://tfl.gov.uk/tube-dlr-overground/status/#northern');
     }
 
     const victoria = lines.find(l => l.id === 'victoria');
@@ -619,7 +736,7 @@ async function loadTubeAndRail() {
       const short = fd.length>80 ? fd.slice(0,80)+'…' : fd;
       renderLineStatus('victoriaStatus','victoriaDesc', severity,
         relevant ? short : `(${myDir==='northbound'?'Southbound':'Northbound'} only)`,
-        'victoriaCard','victoria','https://tfl.gov.uk/tube/line/victoria/status');
+        'victoriaCard','victoria','https://tfl.gov.uk/tube-dlr-overground/status/#victoria');
     }
 
     if (allLinesVisible) renderAllLines(lines);
@@ -630,7 +747,6 @@ async function loadTubeAndRail() {
       const el = document.getElementById(id); if (el) el.innerHTML = `<span class="dot dot-minor"></span>Unavailable`;
     });
   }
-  // Rail is NOT touched here — manual only
 }
 
 function renderAllLines(lines) {
@@ -642,7 +758,6 @@ function renderAllLines(lines) {
   }).join('');
 }
 
-// ── Rail station toggle ──
 function setRailStation(code) {
   returnRailStation = code;
   ['VXH','WAT'].forEach(c => {
@@ -658,7 +773,6 @@ function setRailStation(code) {
   refreshRail();
 }
 
-// ── Bus mode toggle ──
 function setBusMode(mode) {
   returnBusMode = mode;
   const bm = BUS_MODES[mode];
@@ -674,24 +788,29 @@ function setBusMode(mode) {
   loadBus();
 }
 
-// ── Direction switch ──
-function switchDirection() {
-  currentDirection = currentDirection==='outbound' ? 'return' : 'outbound';
+function applyDirection() {
   const isReturn = currentDirection==='return', c = cfg();
-  returnRailStation='VXH'; returnBusMode='413';
   document.getElementById('pageTitle').textContent    = c.title;
   document.getElementById('pageSubtitle').textContent = c.subtitle;
   document.getElementById('directionBtn').title = isReturn ? 'Switch to Outbound' : 'Switch to Return';
   document.getElementById('railStationToggle').style.display = isReturn ? 'flex' : 'none';
   document.getElementById('busModeToggle').style.display     = isReturn ? 'flex' : 'none';
-  if (isReturn) { setRailStation('VXH'); setBusMode('413'); }
-  else {
+  if (isReturn) {
+    setRailStation('VXH'); setBusMode('413');
+  } else {
     document.getElementById('busLabel').textContent     = c.busLabel;
     document.getElementById('railCardName').textContent = c.railName;
     document.getElementById('railCard').href            = c.journeyCheck;
   }
+}
+
+function switchDirection() {
+  currentDirection = currentDirection==='outbound' ? 'return' : 'outbound';
+  returnRailStation='VXH'; returnBusMode='413';
+  applyDirection();
   currentBuses=[]; previousTimes=[]; changeHistory=[]; consecutiveNoDecrease=0;
   vehiclesStillBeforeCheckpoint = new Set();
+  busCardState = null;
   delayState.rail=null; delayState.northern=null; delayState.victoria=null; updateDelayBanner();
   ['railStatus','northernStatus','victoriaStatus'].forEach(id => {
     const el = document.getElementById(id); if (el) el.innerHTML='<span class="dot dot-minor"></span>Checking…';
@@ -702,7 +821,6 @@ function switchDirection() {
   loadBus(); loadTubeAndRail(); refreshRail();
 }
 
-// ── UI toggles ──
 document.getElementById('toggleGraphBtn').addEventListener('click', () => {
   graphVisible = !graphVisible;
   document.getElementById('graphContainer').classList.toggle('hidden', !graphVisible);
@@ -718,28 +836,21 @@ document.getElementById('toggleLinesBtn').addEventListener('click', () => {
 document.getElementById('directionBtn').addEventListener('click', switchDirection);
 document.getElementById('refreshBtn').addEventListener('click', () => { loadBus(); loadTubeAndRail(); });
 
-async function requestWakeLock() {
-  try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch(e) {}
-}
-
 // ── Init ──
 initChart();
-document.getElementById('pageTitle').textContent    = cfg().title;
-document.getElementById('pageSubtitle').textContent = cfg().subtitle;
-document.getElementById('busLabel').textContent     = cfg().busLabel;
-document.getElementById('railCardName').textContent = cfg().railName;
-document.getElementById('railStationToggle').style.display = 'none';
-document.getElementById('busModeToggle').style.display     = 'none';
+applyDirection();  // sets up UI for whichever direction was chosen by time-of-day
 
 loadBus();
 loadTubeAndRail();
 refreshRail();  // once on load only — no interval
 
-setInterval(loadBus, 15000);          // bus: every 15s
-setInterval(loadTubeAndRail, 60000);  // tube only: every 60s — rail NOT included
+setInterval(loadBus, 15000);
+setInterval(loadTubeAndRail, 60000);
 
-requestWakeLock();
-document.addEventListener('visibilitychange', () => { if (!document.hidden) requestWakeLock(); });
+// Wake lock + audio unlock — both need a user gesture on iOS
+enableWakeLock();
+document.addEventListener('click', () => { enableWakeLock(); unlockAudio(); }, {once: true});
+document.addEventListener('touchstart', () => { enableWakeLock(); unlockAudio(); }, {once: true});
 </script>
 </body>
 </html>
